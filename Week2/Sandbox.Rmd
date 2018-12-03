@@ -1,0 +1,121 @@
+---
+title: "Sandbox"
+author: "Michael Berger"
+date: "17 November 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+```
+
+
+```{r cbind.dfm_demo, eval=FALSE, include=FALSE}
+(dfm1 <- dfm(c("a b c d", "c d e f")))
+(dfm2 <- dfm(c("a b", "x y z")))
+cbind(dfm1, dfm2)
+cbind(dfm1, 100)
+cbind(100, dfm1)
+cbind(dfm1, matrix(c(101, 102), ncol = 1))
+cbind(matrix(c(101, 102), ncol = 1), dfm1)
+```
+
+
+```{r pressure, eval=FALSE, include=FALSE}
+(dfm1 <- dfm(c(doc1 = "This is one sample text sample."), verbose = FALSE))
+(dfm2 <- dfm(c(doc2 = "One two three text text."), verbose = FALSE))
+(dfm3 <- dfm(c(doc3 = "This is the fourth sample text."), verbose = FALSE))
+(dfm4 <- dfm(tokens(c(doc3 = "This is the fourth sample text."),  ngrams = 1:2 ), verbose = FALSE))
+rbind(dfm1, dfm2)
+rbind(dfm1, dfm2, dfm3)
+```
+
+```{r}
+x = c("abcde", "ghij", "klmnopq")
+strsplit(x, "", fixed=TRUE)
+tstrsplit(x, "", fixed=TRUE)
+tstrsplit(x, "", fixed=TRUE, fill="<NA>")
+```
+
+
+```{r}
+library(tidyr)
+df <- data.frame(x = c(NA, "a.b", "a.d", "b.c"))
+df %>% separate(x, c("A", "B"))
+```
+
+```{r}
+rs<-colSums(Dfmtoks80k)
+rs <- data.frame(word = names(rs), freq = rs)
+rso <- rs[order(rs, decreasing = T )]
+head(rso)
+arrange
+```
+
+
+```{r}
+lvls <- levels(rs$word)
+from = 10000
+lvls[from:(from+100)]
+```
+
+
+
+```{r}
+library(dplyr)         
+library(NLP)
+library(openNLP)
+library(RWeka)
+library(stringr)
+library(stringi)
+library(wordcloud)
+library(tm)
+#sample the twitter file#
+twitterfile <- twitter <- readLines("../../corpus/en_US/en_US.twitter.txt", encoding="UTF-8", skipNul=T) 
+twitter_s <- sample(twitter, length(twitter) * 0.001)
+remove(twitter) #free up RAM
+#Create a small Vcorpus to work with                 
+docs <- Corpus(VectorSource(twitter_s))#Clean the document
+toSpace <- content_transformer(function(x, pattern) gsub(pattern, " ", x))
+toEmpty <- content_transformer(function(x, pattern) gsub(pattern, "", x))
+docs <- tm_map(docs, toEmpty, "[']")     # Contractions (e.g. I'm)
+docs <- tm_map(docs, toEmpty, "[\U0000231A-\U00002B55]") #Emoji range (e.g. ?)
+docs <- tm_map(docs, toEmpty, "[\U0001F004-\U0001F9F0]") #Emoji range (e.g. ??)
+docs <- tm_map(docs, toEmpty, "#\\w+") #Hashtags (#easy)
+docs <- tm_map(docs, toSpace, "/|@|nn|") 
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, content_transformer(stringi::stri_trans_tolower))
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, stripWhitespace)
+docs <- tm_map(docs, stemDocument)  
+#stem the document
+docs <- tm_map(docs, removeWords, stopwords("english"))
+docs[[1]]
+#Create a Document term matrix 
+dtm <- DocumentTermMatrix(docs)dtm
+#exploring the matrix
+freq <- colSums(as.matrix(dtm))ord <- order(freq)
+# Least frequent terms.
+freq[head(ord)]
+# Most frequent terms.
+
+freq[tail(ord)]
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

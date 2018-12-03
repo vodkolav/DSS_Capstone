@@ -1,0 +1,268 @@
+---
+title: "Week2"
+author: "Michael Berger"
+date: "10 November 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10 - Capstone/corpus/en_US/')
+library(readtext)
+library(quanteda)
+library(SnowballC)
+library(ggplot2)
+library(LaF)
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(data.table)
+library(hunspell)
+```
+
+
+
+```{r}
+enUS <- corpus(readtext('en_US.twitter.short.txt'))
+
+enUSlines <- corpus_segment(enUS,pattern = "\n" )
+docvars(enUSlines,'docnum')<- enUSlines$documents$`_segid`
+rm( enUS)
+
+#phrase <- "A computer once beat me at chess, but it was no match for me at kickboxing"
+#phrase <- tokens(corpus("check out a movie"))
+phrase <- tokens(corpus("rt"))
+#cl <- textstat_collocations(phrase)
+beat <- kwic(enUSlines,pattern = phrase, window = 50, case_insensitive = T, valuetype = "regex")
+hasbeat <- beat[lengths(beat)>0]
+
+bio <- enUSlines[15]
+bio
+texts
+textstat_select(enUSlines, pattern = phrase,selection = "keep", valuetype = "fixed")
+enUSlines[15]
+```
+
+```{r}
+texts(enUSlines)[5]
+```
+
+```{r}
+#enUS <- corpus(char_tolower(readNlines('en_US.twitter.txt', 40000)))
+
+enUS <- corpus(char_tolower(get_lines('en_US.twitter.txt', 1:40000)))
+lns <- get_lines('en_US.twitter.txt',1:2)# 40001:80000)
+if (is.na(lns[1]))
+  stop("shnitzl: couldn't read from file. probably path is wrong")
+enUS80k <- corpus(char_tolower(get_lines('en_US.twitter.txt', 40001:80000))) 
+head(texts(enUS80k))
+
+profane <-char_tolower(get_lines('profanity_words.txt', 1:450))
+
+# length(unique(profane))
+tail(profane)
+#enUSlines <- corpus_segment(enUS,pattern = "\n" )
+#rm(enUS)
+#save(enUSlines, file = "en_US.twitter.corpus.rds")
+
+```
+
+
+#Search for keywords in context
+```{r}
+#what = " +(rt) +"
+what = 
+phrase <- tokens(corpus(what), what = "word")
+context <- kwic(enUS80k ,pattern = what, window = 50, case_insensitive = T, valuetype = "regex")
+
+txts <- enUS80k[context$docname]
+head(txts, 20)
+
+```
+
+```{r}
+#words <- tokens(corpus(txts[1]))
+words <- c("beer", "wiskey", "wine", "fsdngl")
+correct <- hunspell_check(words, dict = dictionary("en_US"))
+print(correct)
+```
+
+
+```{r}
+enUStok <- tokens(enUS, what = "word", remove_numbers = T, remove_punct = T,
+  remove_symbols = T, remove_separators = T,
+  remove_twitter = T, remove_hyphens = T, remove_url = T,
+  ngrams = 2:3)
+
+```
+
+```{r}
+twitter_data <- stri_trans_general(twitter_data, "latin-ascii") #remove non-ASCII characters
+# "(^|( +))(RT|rt)($| *:| +)"  regex to find RT (ReTweet) tag
+
+
+toks <- tokens(enUS80k, what = "word", remove_numbers = T, remove_punct = T,
+  remove_symbols = T, remove_separators = T,
+  remove_twitter = T, remove_hyphens = T, remove_url = T)
+toks <- tokens_remove(toks, c(stopwords("english"), profane))
+bigrams <- tokens_ngrams(toks, 2)
+
+
+```
+
+
+```{r}
+
+Dfmtoks80k <- dfm(toks, tolower = TRUE, stem = F) # no stemming required i think
+tf <- topfeatures(Dfmtoks80k,1000, scheme =  "docfreq")
+
+tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
+
+Plot <- ggplot(head(tf,50), aes(x=reorder(words, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') +
+        coord_flip() #+ xlab(xlabel) + ylab(ylabel) + ggtitle(Gtitle)
+Plot
+```
+
+
+```{r}
+Dfm2grm80k <- dfm(bigrams, tolower = TRUE, stem = F) # no stemming required i think
+tf <- topfeatures(bigramsDfm,1000, scheme =  "docfreq")
+
+tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
+
+Plot <- ggplot(head(tf,50), aes(x=reorder(words, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') +
+        coord_flip() #+ xlab(xlabel) + ylab(ylabel) + ggtitle(Gtitle)
+Plot
+```
+
+
+```{r}
+ngrams <- tokens_ngrams(toks, n = 3)
+trigramsDfm <- dfm(ngrams, tolower = TRUE, stem = F) # no stemming required i think
+tf <- topfeatures(trigramsDfm,50, scheme =  "docfreq")
+
+tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
+
+Plot <- ggplot(head(tf,50), aes(x=reorder(words, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') +
+        coord_flip() #+ xlab(xlabel) + ylab(ylabel) + ggtitle(Gtitle)
+Plot
+```
+
+
+```{r}
+ng <- rbind.dfm(Dfm2grm40k , Dfm2grm80k)
+```
+
+```{r}
+# Bigram word combinations plot
+Dfm2grm80k <- dfm(bigrams, tolower = TRUE, stem = F) # no stemming required i think
+tf <- topfeatures(Dfm2grm80k,2000, scheme =  "docfreq")
+
+tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
+
+# tfm <- mutate(tfm, word1 = strsplit(words,"_")[[1,]], word2 = strsplit(words,"_")[[2,]])
+# word1 = strsplit(tfm$words,"_")
+# word1[1][]
+# tfm$word1 <- lapply(tf$words, FUN = function(wd) {strsplit(wd,"_")[[1]]}) 
+# tfm$word2 <- lapply(tf$words, function(wd) {strsplit(wd,"_")[[2]]}) 
+tfm <- tf %>% separate(col=words, sep = "_", into =c("word1", "word2"),remove =F)
+#g<- ggplot(tfm, aes(word2,word1)) + geom_raster(aes(fill = freq)) + scale_fill_brewer(1)
+  #scale_fill_viridis_c(option = "inferno")
+
+g<- ggplot(tfm, aes(x=word2,y=word1, text = words, col = freq)) + geom_point(size = 1) + 
+   scale_fill_viridis_c(aesthetics = "col",option = "D", direction = -1) + theme_classic()
+ggplotly(g, tooltip = c("text","freq"))
+
+
+length(unique(tfm$word1))
+length(unique(tfm$word2))
+```
+
+
+
+```{r fcm_plot}
+if(F)
+toks <- corpus_subset(enUS) %>%
+    tokens(remove_punct = TRUE) %>%
+    tokens_tolower() %>%
+    tokens_remove(stopwords("english"), padding = FALSE)
+myfcm <- fcm(toks, context = "window", tri = FALSE)
+feat <- names(topfeatures(myfcm, 30))
+fcm_select(myfcm, feat, verbose = FALSE) %>%
+    textplot_network(min_freq = 0.5)
+```
+
+
+
+# should use benchmarking (https://github.com/hfoffani/dsci-benchmark)
+# should use LaF package (https://rdrr.io/cran/LaF/man/)  (Fast Access to Large ASCII Files)
+
+
+
+# get number of lines
+```{r }
+nlines <- function(filename )
+{
+  tic <- Sys.time()
+  testcon <- file(filename,open="r")
+  readsizeof <- 20000
+  answer <- 0
+  while((linesread <- length(readLines(testcon,readsizeof))) > 0 ) 
+  {
+    answer <- answer+linesread 
+  }
+  close(testcon)
+  toc <- Sys.time() - tic
+  print(toc)
+  answer
+}
+
+nlines("/home/michael/Studies/Coursera/10 - Capstone/corpus/en_US/en_US.twitter.txt")
+```
+
+
+
+```{r}
+
+
+readNlines <- function(filename, N)
+{
+  tic <- Sys.time()
+  #N <- 40000
+  #filename <- "en_US.twitter.txt"
+  conn <- file(filename,open="r")
+  lines <- readLines(conn,N)
+  close(conn)
+  toc <- Sys.time() - tic
+  toc
+  lines
+}
+#test
+t <-readNlines("en_US.twitter.txt", 13)
+```
+
+```{r}
+readRangelines <- function(filename, from = 0 , to, num)
+{
+  #N <- 40000
+  #filename <- "en_US.twitter.txt"
+  conn <- file(filename,open="r")
+  if(from!=0)
+    devnull <- readLines(conn,from-1)
+  if(missing(num)){num <- to-from}
+  if(from > to) {stop("You think you are funny?")}
+  lines <- readLines(conn,num)
+  close(conn)
+  lines
+}
+#test
+readRangelines("en_US.twitter.txt",7,4)
+```
+
+
+
+
+

@@ -1,0 +1,72 @@
+---
+title: "Milestone Report"
+author: "Michael Berger"
+date: "2 December 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10 - Capstone/final/en_US/')
+library(readtext)
+library(quanteda)
+library(SnowballC)
+library(ggplot2)
+library(LaF)
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(data.table)
+```
+ 
+ 
+  summaries:
+    number of lines 
+    num words + per line + distribution  (ntokens, ntype)
+    
+ 
+  Read a limited random sample of text file
+  Everything to lower
+  create corpus
+  read profanity vocabulary and convert to lower
+  
+  create word tokens, while removing unwanted tokens:
+    v numbers 
+    v punctuation 
+    v symbols
+    v separators
+    v hyphens
+    v url    
+    v twitter (leave twe word after # in #hashtag)
+    x twitter rt tag (tokens_remove)    
+    x foreign languages characters (non-ASCII characters)
+    x english stopwords
+    x profane words
+  I decided not to do stemming because 
+    1) it converts some words in a strange manner 
+    2) the model will output stemmed words as prediction.
+    
+  Create ngrams: 1,2,3
+  
+  barplot with 30 most frequent 1,2,3 grams
+
+  determine how much data i need to cover 50% and 90% of the words
+  plot a graph of coverage
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,183 @@
+---
+title: "Quiz1"
+author: "Michael Berger"
+date: "6 November 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10 - Capstone/final/en_US')
+library(readtext)
+library(quanteda)
+library(stopwords)
+```
+
+
+
+Q1
+210 Megabyte
+
+Q2
+2360148 lines opened with gedit
+
+Q3
+
+
+```{r Q3, echo=FALSE}
+#enUS <- readtext('en_US/subs.txt')
+
+enUS <- corpus(readtext('en_US/en_US.blogs.txt'))
+enUS <- enUS + corpus(readtext('en_US/en_US.news.txt'))
+ntoken(enUScorp)
+corpus_segment()
+ndoc(enUS)
+#corpDF <- convert(enUScorp, to =c('data.frame'))
+summary(enUScorp)
+cs <- corpus_segment(enUS,pattern = "\n" )
+lens <- nchar(cs$documents$texts)
+barplot(lens)
+max(lens)
+tail(cs$documents$texts)
+```
+
+
+Q4
+
+```{r}
+
+enUS <- corpus(readtext('en_US/en_US.twitter.txt'))
+
+#enUSlines <- corpus_reshape(enUS, to = "paragraphs")
+enUSlines <- corpus_segment(enUS,pattern = "\n" )
+#ndoc(enUSlines)
+rm( enUS)
+
+enUStkn <- tokens(enUSlines, what = "word")
+
+love <- tokens_select(enUStkn,pattern = "love", selection = "keep", case_insensitive = F, valuetype = "fixed")
+hate <- tokens_select(enUStkn,pattern = "hate", selection = "keep", case_insensitive = F, valuetype = "fixed")
+sum(lengths(hate)>0)/sum(lengths(love)>0)
+
+# further lines are for explorative inference
+hl<-head(love,1000)
+HL <- head(love,1000)
+length(hl[[]])
+haslove <- love[lengths(love)>0]
+hl <- unlist(haslove)
+
+fileConn<-file("output.txt")
+writeLines(hl, fileConn)
+close(fileConn)
+
+
+names(lovenums)<-NULL
+sum(lovenums)
+plot(lovenums, 0*seq(1,77284,1) )
+names(lens) <- NULL
+sum(lens>0)
+
+```
+
+Q5
+```{r}
+biostats <- tokens_select(enUStkn,pattern = "biostats", selection = "keep", case_insensitive = F, valuetype = "fixed")
+hasbiostats <- biostats[lengths(biostats)>0]
+bio <- enUSlines[556871]
+bio
+```
+Answer: 
+
+en_US.twitter.txt.556871 
+"i know how you feel.. i have biostats on tuesday and i have yet to study =/" 
+
+
+
+Q6
+```{r}
+enUS <- corpus(readtext('en_US.twitter.txt'))
+
+enUSlines <- corpus_segment(enUS,pattern = "\n" )
+rm( enUS)
+
+
+
+phrase <- tokens(corpus("A computer once beat me at chess, but it was no match for me at kickboxing"))
+beat <- kwic(enUSlines,pattern = phrase, window = 50, case_insensitive = F, valuetype = "fixed")
+hasbeat <- beat[lengths(beat)>0]
+hasbeat
+```
+  Result:
+  [en_US.twitter.txt.519058, 1:17]  | A computer once beat me at chess , but it was no match for me at kickboxing
+  [en_US.twitter.txt.835823, 1:17]  | A computer once beat me at chess , but it was no match for me at kickboxing
+ [en_US.twitter.txt.2283422, 1:17]  | A computer once beat me at chess , but it was no match for me at kickboxing
+ Answer: the phrase appears 3 times 
+
+
+same as Q6 but with shorter sample. for speed 
+```{r}
+enUS <- corpus(readtext('en_US/en_US.twitter.short.txt'))
+
+enUSlines <- corpus_segment(enUS,pattern = "\n" )
+docvars(enUSlines,'docnum')<- enUSlines$documents$`_segid`
+rm( enUS)
+
+#phrase <- "A computer once beat me at chess, but it was no match for me at kickboxing"
+phrase <- tokens(corpus("check out a movie"))
+#cl <- textstat_collocations(phrase)
+beat <- kwic(enUSlines,pattern = phrase, window = 50, case_insensitive = T, valuetype = "regex")
+hasbeat <- beat[lengths(beat)>0]
+
+bio <- enUSlines[15]
+bio
+texts
+textstat_select(enUSlines, pattern = phradse,selection = "keep", valuetype = "fixed")
+enUSlines[15]
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+blogs <-corpus(readtext('en_US/en_US.blogs.txt'))
+news <- corpus(readtext('en_US/en_US.news.txt'))
+twit <- corpus(readtext('en_US/en_US.twitter.txt'))
+enUS <- blogs + news + twit
+rm(blogs , news , twit)
+
+enUSlines <- corpus_segment(enUS,pattern = "\n" )
+ndoc(enUSlines)
+
+love <- corpus_subset(enUSlines,pattern = "love")
+hate <- corpus_segment(enUSlines,pattern = "hate")
+
+length(love$documents$texts)/length(hate$documents$texts)
+```
+
+
+
+```{r }
+save(enUScorp, file = 'enUScorp.rds')
+```
+
+
+```{r}
+load("en_US/enUScorp.rds")
+```
+
+
+
+
+
+
+
+
+
+
