@@ -4,6 +4,9 @@
 
 # Session Data files
 **.RData
+**.rds
+Week2/Milestone_Report_files
+Week2/Milestone_Report_cache
 
 # Example code in package build process
 *-Ex.R

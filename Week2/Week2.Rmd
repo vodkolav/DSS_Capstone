@@ -71,21 +71,44 @@ tail(profane)
 #Search for keywords in context
 ```{r}
 #what = " +(rt) +"
-what = 
-phrase <- tokens(corpus(what), what = "word")
-context <- kwic(enUS80k ,pattern = what, window = 50, case_insensitive = T, valuetype = "regex")
+what = "ぶ"
+#what =  "#\\w+" 
+#phrase <- tokens(corpus(what), what = "word")
+context <- kwic(twitCorp ,pattern = what, window = 50, case_insensitive = T, valuetype = "regex")
 
-txts <- enUS80k[context$docname]
-head(txts, 20)
-
+txts <- twitCorp[context$docname]
+htags <- context$keyword
+head(htags, 20)
+txts
 ```
 
 ```{r}
 #words <- tokens(corpus(txts[1]))
-words <- c("beer", "wiskey", "wine", "fsdngl")
+words <- c("beer", "wiskey", "wine", "fsdngl","Taurus")
 correct <- hunspell_check(words, dict = dictionary("en_US"))
 print(correct)
 ```
+
+```{r}
+# this is a regex to find and substitute tokens which start with a number
+withnums <- lvls[1:608]
+#tail(lvls,40)
+
+wn <- withnums[!grepl(pattern = "^(\\d+[,.]?)+", withnums)]
+View(wn)
+
+wihtoutnums <- gsub(pattern = "^(\\d+[,.]?)+", "", withnums)
+
+View(cbind(withnums, wihtoutnums))
+```
+
+
+
+```{r}
+# My attempt to create Twitter Hashtags segmentation algorithm 
+source('~/Studies/Coursera/10 - Capstone/DSS_Capstone/Week2/hastags.r')
+```
+
 
 
 ```{r}
@@ -96,9 +119,13 @@ enUStok <- tokens(enUS, what = "word", remove_numbers = T, remove_punct = T,
 
 ```
 
+
+
 ```{r}
 twitter_data <- stri_trans_general(twitter_data, "latin-ascii") #remove non-ASCII characters
-# "(^|( +))(RT|rt)($| *:| +)"  regex to find RT (ReTweet) tag
+
+
+# "(^|( +))(RT|rt)($| *:| +)"  regex to find RT (ReTweet) tag. Dont really need it. just remove_tokens("rt")
 
 
 toks <- tokens(enUS80k, what = "word", remove_numbers = T, remove_punct = T,
@@ -110,6 +137,17 @@ bigrams <- tokens_ngrams(toks, 2)
 
 ```
 
+```{r}
+rs<-colSums(Dfmtoks80k)
+rs <- data.frame(word = names(rs), freq = rs)
+rso <- rs[order(rs, decreasing = T )]
+
+
+# with this you can check if there are some non-ascii chars remaining in dfm like chinese or russian 
+lvls <- levels(rs$word)
+from = 10000
+lvls[from:(from+100)]
+```
 
 ```{r}
 
@@ -202,7 +240,7 @@ fcm_select(myfcm, feat, verbose = FALSE) %>%
 
 
 
-# get number of lines
+# get number of lines. there is a  determine_nlines function in the LaF package and its 52 times faster.
 ```{r }
 nlines <- function(filename )
 {
@@ -220,9 +258,19 @@ nlines <- function(filename )
   answer
 }
 
-nlines("/home/michael/Studies/Coursera/10 - Capstone/corpus/en_US/en_US.twitter.txt")
+nl <- nlines("en_US.twitter.txt")
+
+tic <- Sys.time()
+dnl <- determine_nlines("en_US.twitter.txt")
+toc <- Sys.time() - tic
+print(toc)
+9.9/0.19
+
 ```
 
+```{r}
+timeit
+```
 
 
 ```{r}

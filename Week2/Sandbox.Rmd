@@ -49,12 +49,9 @@ df %>% separate(x, c("A", "B"))
 rs<-colSums(Dfmtoks80k)
 rs <- data.frame(word = names(rs), freq = rs)
 rso <- rs[order(rs, decreasing = T )]
-head(rso)
-arrange
-```
 
 
-```{r}
+# with this you can check if there are some non-ascii chars remaining in dfm like chinese or russian 
 lvls <- levels(rs$word)
 from = 10000
 lvls[from:(from+100)]
@@ -65,11 +62,11 @@ lvls[from:(from+100)]
 ```{r}
 library(dplyr)         
 library(NLP)
-library(openNLP)
-library(RWeka)
+#library(openNLP)
+#library(RWeka)
 library(stringr)
 library(stringi)
-library(wordcloud)
+#library(wordcloud)
 library(tm)
 #sample the twitter file#
 twitterfile <- twitter <- readLines("../../corpus/en_US/en_US.twitter.txt", encoding="UTF-8", skipNul=T) 
@@ -83,7 +80,7 @@ docs <- tm_map(docs, toEmpty, "[']")     # Contractions (e.g. I'm)
 docs <- tm_map(docs, toEmpty, "[\U0000231A-\U00002B55]") #Emoji range (e.g. ?)
 docs <- tm_map(docs, toEmpty, "[\U0001F004-\U0001F9F0]") #Emoji range (e.g. ??)
 docs <- tm_map(docs, toEmpty, "#\\w+") #Hashtags (#easy)
-docs <- tm_map(docs, toSpace, "/|@|nn|") 
+#docs <- tm_map(docs, toSpace, "/|@|nn|") # malicious operation. puts space between each letter
 docs <- tm_map(docs, removePunctuation)
 docs <- tm_map(docs, content_transformer(stringi::stri_trans_tolower))
 docs <- tm_map(docs, removeNumbers)
@@ -93,7 +90,8 @@ docs <- tm_map(docs, stemDocument)
 docs <- tm_map(docs, removeWords, stopwords("english"))
 docs[[1]]
 #Create a Document term matrix 
-dtm <- DocumentTermMatrix(docs)dtm
+dtm <- DocumentTermMatrix(docs)
+dtm
 #exploring the matrix
 freq <- colSums(as.matrix(dtm))ord <- order(freq)
 # Least frequent terms.
