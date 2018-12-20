@@ -21,6 +21,35 @@ library(hunspell)
 ```
 
 
+```{r summaries, echo=FALSE, cache=T}
+
+wc <- function(path)
+{
+    path = paste("'",path, "'", sep = "")
+    w1 <- system(paste("wc -lwc",path), intern=TRUE)
+    wsplit <- unlist(strsplit(w1," +"))
+    wnum <-as.numeric(wsplit[2:4])
+    return(data.frame('file' = wsplit[5], 'lines'=wnum[1], 'words'=wnum[2], 'chars'=wnum[3]))
+}
+
+folder = "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US"
+
+path <- paste(folder, currentFile, sep = "/")
+
+filesinfo <- wc(path)
+
+files = list.files(".", full.names = F)
+
+
+lines = lapply(files, FUN = wc)# determine_nlines)
+
+lala <- ldply(lines, rbind)
+
+files <- data.frame(numlines = lines, stringsAsFactors = F)#, lines = as.vector(t(lns), mode = "any")
+
+kable(files)
+```
+
 
 ```{r}
 enUS <- corpus(readtext('en_US.twitter.short.txt'))
@@ -217,6 +246,39 @@ ggplotly(g, tooltip = c("text","freq"))
 
 length(unique(tfm$word1))
 length(unique(tfm$word2))
+```
+
+
+```{r}
+
+#An attempt to make a plot with less code using facet_grid. not really suitable for what I whant.  
+tf <- topfeatures(Dfm1gr,30, scheme =  "docfreq")
+tf1 <- data.frame(words = names(tf), freq = tf, gram = rep(1,length(tf)) , stringsAsFactors = F)
+
+tf <- topfeatures(Dfm2gr,30, scheme =  "docfreq")
+tf2 <- data.frame(words = names(tf), freq = tf , gram = rep(2,length(tf)) , stringsAsFactors = F)
+
+tf <- topfeatures(Dfm3gr,30, scheme =  "docfreq")
+tf3 <- data.frame(words = names(tf), freq = tf, gram = rep(3,length(tf))  , stringsAsFactors = F)
+
+tf <- rbind(tf1, tf2,tf3)
+                     
+plt123grm <- ggplot(tf, aes(x=reorder(words, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') + facet_grid(. ~ gram, scales = "free") +
+        coord_flip() + xlab("1-grams") + ylab("Number of Apperarances") + ggtitle(" most frequent tokens") 
+
+plt123grm
+
+  
+grid.arrange(plt1grm, plt2grm, plt3grm, ncol=3)
+
+```
+
+```{r}
+
+ggplot(mlt, aes(x  = Var1, y = Var2)) + geom_raster(aes(fill = value), hjust=0.5,
+vjust=0.5, interpolate=FALSE)
+mlt <- melt(mt)
 ```
 
 

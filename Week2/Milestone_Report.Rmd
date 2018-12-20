@@ -2,18 +2,23 @@
 title: "Milestone Report"
 author: "Michael Berger"
 date: "2 December 2018"
-output: html_document
+output: 
+  html_document: 
+    fig_height: 7
+    fig_width: 11
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10 - Capstone/corpus/en_US/')
+```{r first, include=FALSE}
+#knitr::opts_chunk$set(include = FALSE)
+knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/corpus/en_US/')
+setwd('~/Studies/Coursera/10-Capstone/corpus/en_US/')
 library(knitr)
 library(readtext)
 library(quanteda)
 library(SnowballC)
 library(ggplot2)
 library(LaF)
+library(plyr)
 library(dplyr)
 library(tidyr)
 library(plotly)
@@ -21,153 +26,162 @@ library(data.table)
 library(stringi)
 library(hunspell)
 library(gridExtra)
+library(viridis)
+library(RColorBrewer)
 ```
+
+
+##Abstract
+In this project we will try to develop next word prediction system at typing. For this task we are provided by the JHU partner swiiftkey with data  
+The data provided  
  
- 
-  summaries:
-    number of lines 
-    num words + per line + distribution  (ntokens, ntype)
+## Summaries
+First, let's see the scale of the problem.  
+Since the files are very large and R is only able to work in-memory, I will use operating system's wc operation to count lines, words and characters.
     
 ```{r summaries, echo=FALSE, cache=T}
 
-folder = "/home/michael/Studies/Coursera/10 - Capstone/corpus/en_US"
+wc <- function(path)
+{
+    size <- round(file.size(path)/(2^20))
+    path = paste("'",path, "'", sep = "")
+    w1 <- system(paste("wc -lwc",path), intern=TRUE)
+    
+    wsplit <- unlist(strsplit(w1," +"))
+    wnum <-as.numeric(wsplit[2:4])
+    return(data.frame('file' = wsplit[5], 'size,MiB' = size, 'lines'=wnum[1], 'words'=wnum[2], 'chars'=wnum[3], stringsAsFactors = F))
+}
 
-files = list.files(folder, full.names = F)
+files = list.files(".",pattern = "en*", full.names = F)
 
-lines = sapply(files, FUN = determine_nlines)
+files = lapply(files, FUN = wc)# determine_nlines)
 
-files <- data.frame(numlines = lines, stringsAsFactors = F)#, lines = as.vector(t(lns), mode = "any")
+#filesbk <- files #files <- filesbk  , stringsAsFactors = F
 
-kable(files)
+files <- data.frame(ldply(files, rbind))
+rownames(files) = files$file
+
+files[nrow(files)+1,2:5] <- apply(files[,2:5],2,sum)
+files[nrow(files),1] <- "Total"
+
+files$wordsPerLine <- round(files$words/files$lines)
+files$charsPerLine <- round(files$chars/files$lines)
+
+kable(files, row.names = F,format.args = list(decimal.mark = ".", big.mark = ","))
 ```
  
+As one can see the numbers are truly enormous. I will try to use a 1% of the lines to perform some preliminary analyses.
 
- 
- 
-  Read a limited random sample of text file
-  Everything to lower
-  remove foreign languages characters (non-ASCII characters)
+
+##Creating corpus
+  Read a limited random sample of text file   
+```{r}
+oneprc <- round(files$lines * .1, -3) 
+names(oneprc)<- files$file
+
+kable(oneprc, col.names = "1%")
+```  
+  A 100,000 lines seems to be a reasonable sample. Also, I will perform analysis on one of the files, since text is always text.
+  Then convert everything to lowerCase and remove foreign languages characters (non-ASCII characters)
   
   create corpus
  
 ```{r Corpus}
  
+
 if (is.na(get_lines('en_US.twitter.txt',1:2)[1])) # check that I can read from file
-  stop("shnitzl: couldn't read from file. probably path is wrong")
+  stop("couldn't read from file. probably path is wrong")
 
 set.seed(42)
 currentFile = 'en_US.twitter.txt'
-twitLines <- sample_lines(currentFile, 50000, files[currentFile,]) #sample some lines from a file
+Lines <- sample_lines(currentFile, 100000, files[currentFile,]$lines) #sample some lines from a file
 
-Encoding(twitLines) <- "latin1"  #remove non-ascii chars 
-twitLines <- iconv(twitLines, "latin1", "ASCII", sub="")
+Encoding(Lines) <- "latin1"  #remove non-ascii chars 
+Lines <- iconv(Lines, "latin1", "ASCII", sub="")
 
-twitCorp <- corpus(char_tolower(twitLines)) # everything to lowerCase and create corpus
+Corp <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
 
-head(texts(twitCorp))
+paste(head(texts(Corp)))
 
 ```
 
  read profanity vocabulary and convert to lower
 
 ```{r profane}
-profane <-char_tolower(get_lines('profanity_words.txt', 1:450))
+l <- determine_nlines('profanity_words.txt')
+profane <-char_tolower(get_lines('profanity_words.txt', 1:l))
 profane <- profane[!is.na(profane)]
-tail(profane)
 ```
 
 
   
-  create word tokens, while removing unwanted tokens:
-    v numbers 
-    v punctuation 
-    v symbols
-    v separators
-    v hyphens
-    v url    
-    v twitter (leave twe word after # in #hashtag)
-    v twitter rt tag (tokens_remove)   
-    v english stopwords
-    v profane words
+##Creating word tokens, while removing unwanted tokens:  
+    - numbers  
+    - punctuation  
+    - symbols  
+    - separators  
+    - hyphens  
+    - url 
+    - twitter (leaving the word after # in #hashtag)  
+    - twitter rt tag
+    - english stopwords  
+    - profane words  
     
 ```{r}
-twitToks<- tokens(twitCorp, what = "word", remove_numbers = T, remove_punct = T,
+Toks<- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T,
   remove_symbols = T, remove_separators = T,
   remove_twitter = T, remove_hyphens = T, remove_url = T)
-twitToks<- tokens_remove(twitToks, c(stopwords("english"), profane, "rt"))  # also remove ReTweet tag
+Toks<- tokens_remove(Toks, c(stopwords("english"), profane, "rt"))  # also remove ReTweet tag
 ```
     
     
-  I decided not to do stemming because 
-    1) it converts some words in a strange manner 
-    2) the model will output stemmed words as prediction.
+I decided not to do stemming because:  
+  - it converts some words in a strange manner  
+  - the model will output stemmed words as prediction which is undesired behaviour   
     
-  
-  create dfm  
+##Document Frequency Matrix  
 
-  
   
 ```{r}
 
-Dfm1gr <- dfm(twitToks, tolower = TRUE, stem = F) # no stemming required i think
-rs<-colSums(Dfm1gr) # maybe its betteer to use docfreq()
-rs <- data.frame(word = names(rs), freq = rs)
-tf <- rs[order(rs$freq, decreasing = T ),]
+Dfm1gr <- dfm(Toks, tolower = TRUE, stem = F) # no stemming required i think
+
 
 #tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
 
-Plot <- ggplot(head(tf,30), aes(x=reorder(word, freq), y=freq)) + 
-        geom_bar(stat="Identity", fill='red') +
-        coord_flip() + xlab("frequency") + ylab("Number of Words") + ggtitle("1-grams most frequent tokens")
-Plot
+
 ```
   
-  check non-ASCII characters actually got removed  
+###Check that non-ASCII characters actually got removed  
+  If present, these chars should be immediately seen at the beginning or at the end of sorted tokens list.
   
 ```{r echo=FALSE}
 # with this you can check if there are some non-ascii chars remaining in dfm like chinese or russian 
+rs <-colSums(Dfm1gr) # maybe its betteer to use docfreq()
+rs <- data.frame(word = names(rs), freq = rs)
+tf <- rs[order(rs$freq, decreasing = T ),]
 lvls <- levels(rs$word)
 n = 1
 #lvls[n:(n+100)]
-cat(head(lvls,100), sep ="; ")
+cat(head(lvls,50), sep ="; ")
+cat(tail(lvls,50), sep ="; ")
 ```
+And I see that there are none. Even though there are some pseudo-words here, like "100,00th", these will be filtered out as having too low a frequency in the Document Feature Matrix.
 
-  Create ngrams: 1,2,3
+##Statistics
+Since the data is very big, I have to find ways to make it smaller. 
+Intuition tells me that 
+One way is to filter out terms that are of very low frequency. 
+For this I need to determine how much data I need to cover 50% and 90% of the words
 
-
-```{r}
-bigrams <- tokens_ngrams(twitToks, 2)
-trigrams <- tokens_ngrams(twitToks, 3)
-# (head(bigrams))
-# (head(trigrams))
-
-Dfm2gr <- dfm(bigrams, tolower = TRUE, stem = F)
-Dfm3gr <- dfm(trigrams, tolower = TRUE, stem = F)
-```
-
-  
-  barplot with 30 most frequent 1,2,3 grams
-
-
-
-
-  determine how much data i need to cover 50% and 90% of the words
-  plot a graph of coverage
-  
   
 ```{r}
-freq1gr <- docfreq(Dfm1gr)
-
+freq1gr <- colSums(Dfm1gr)
 freq1gr <- data.frame(words = names(freq1gr), freq = freq1gr , stringsAsFactors = F)
-
 freq1gr  <- freq1gr[order(freq1gr$freq, decreasing = T ),]
-
 freq1gr$wc <- 1:nrow(freq1gr)
-
 freq1gr$cs <- cumsum(freq1gr$freq)
-
 freq1gr$perc <- freq1gr$cs/tail(freq1gr$cs,1)
-
 
 closest <- function(w,x)
 {
@@ -176,47 +190,74 @@ closest <- function(w,x)
   return(dt[J(x), .I, roll = "nearest", by = .EACHI])
 }
 
-cl <-rbind( closest(freq1gr$perc,.5),closest(freq1gr$perc,.9),closest(freq1gr$perc,.99))
-cl$p <- floor(cl$I/nrow(freq1gr)*100)
+#cl <-rbind( closest(freq1gr$perc,.5),closest(freq1gr$perc,.9),closest(freq1gr$perc,.99))
 
-cumulative <- ggplot(data = freq1gr ,aes(x = wc, y = perc)) + geom_line() +
-              geom_hline(aes(yintercept =  w, col = c("blue","red", "green")),data = cl, show.legend = F)  +
-              geom_label(aes(x = I, y = w+.04, label=paste(I, " ≈ ", p ,"%"), col = c("blue","red", "green")), data = cl, show.legend = F)
+cl<-closest(freq1gr$perc,c(.5, .9, .99))
 
-cumulative
-                     
-                     
-                     
-plt1grm <- ggplot(head(freq1gr,30), aes(x=reorder(words, freq), y=freq)) + 
-        geom_bar(stat="Identity", fill='red') +
-        coord_flip() + xlab("frequency") + ylab("Number of Words") + ggtitle("1-grams most frequent tokens") 
-      
+cl$p <- round((cl$I/nrow(freq1gr))*100)
 
-plt1grm
+cl$col <- brewer.pal(3, "Set1")
 
+coverage <- ggplot(data = freq1gr ,aes(x = wc, y = perc)) + geom_line() +
+              geom_hline(aes(yintercept =  w, col = col),data = cl, show.legend = F)  +
+              geom_label(aes(x = I, y = w+.04, label=paste(I, " ≈ ", p ,"%"), col = col ), data = cl, show.legend = F) + xlab("num of unique words") + ylab("% most frequent tokens") #+ brewer.pal(7, "BrBG")  #scale_fill_brewer(palette="Dark2")
 
+coverage
 ```
   
-  27% most frequent tokens cover 90% of all unique words in 50k lines sample. 
+So I see that the coverage graph grows very fast which means that about 20% most frequent tokens cover 90% of all unique words in a 100k lines sample. 
+  
+  
+##N-grams
+N-grams are a sequences of n words taken from a corpus and incorporated as a single token.
+So if a corpus was "The quick brown fox jumps over the lazy dog" then 3-grams for it would be:
+
+```{r echo=FALSE}
+fox = "The quick brown fox jumps over the lazy dog "
+dfoxm = tokens(fox,ngrams = 3, remove_number =T)
+myfun <- function(x) {paste("\n", strrep(" ",cumsum(nchar(x)+1)))}
+lal <- sapply(strsplit(fox," "),myfun)
+cat(unlist(dfoxm), sep = lal)
+```
   
   
 ```{r}
-tf <- topfeatures(Dfm2gr,30, scheme =  "docfreq")
-tf2 <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
+bigrams <- tokens_ngrams(Toks, 2)
+trigrams <- tokens_ngrams(Toks, 3)
 
-tf <- topfeatures(Dfm3gr,30, scheme =  "docfreq")
-tf3 <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
-
-plt2grm <- ggplot(head(tf2,30), aes(x=reorder(words, freq), y=freq)) + 
-        geom_bar(stat="Identity", fill='red') +
-        coord_flip() + xlab("frequency") + ylab("Number of Words") + ggtitle("2-grams most frequent tokens") 
-        
-plt3grm <- ggplot(head(tf3,30), aes(x=reorder(words, freq), y=freq)) + 
-        geom_bar(stat="Identity", fill='red') +
-        coord_flip() + xlab("frequency") + ylab("Number of Words") + ggtitle("3-grams most frequent tokens") 
+Dfm2gr <- dfm(bigrams, tolower = TRUE, stem = F)
+Dfm3gr <- dfm(trigrams, tolower = TRUE, stem = F)
+```
 
   
-grid.arrange(plt2grm, plt3grm, ncol=2)
+A plot of most frequent 1,2,3-grams shows us that even such simple algorithm is indeed able to locate most frequent combinations of words we use in daily life.  
+  
+  
+```{r}
+knitr::opts_chunk$set(fig.width = 9)
+tf <- topfeatures(Dfm2gr,30, scheme =  "count")
+tf2 <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
+
+tf <- topfeatures(Dfm3gr,30, scheme =  "count")
+tf3 <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
+
+
+                     
+plt1grm <- ggplot(head(freq1gr,30), aes(x=reorder(words, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') + xlab("") +
+        coord_flip() + ylab("Number of Appearances") + ggtitle("most frequent 1grams") 
+
+plt2grm <- ggplot(head(tf2,30), aes(x=reorder(words, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') + xlab("") +
+        coord_flip() + ylab("Number of Appearances") + ggtitle("most frequent 2grams") 
+        
+plt3grm <- ggplot(head(tf3,30), aes(x=reorder(words, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') + xlab("") +
+        coord_flip() + ylab("Number of Appearances") + ggtitle("most frequent 3grams") 
+      
+
+  
+grid.arrange(plt1grm, plt2grm, plt3grm, ncol=3)
 
 ```
 
