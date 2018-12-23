@@ -8,36 +8,33 @@ output:
     fig_width: 11
 ---
 
-```{r first, include=FALSE}
+```{r setup, include=FALSE}
 #knitr::opts_chunk$set(include = FALSE)
 knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/corpus/en_US/')
-setwd('~/Studies/Coursera/10-Capstone/corpus/en_US/')
-library(knitr)
-library(readtext)
-library(quanteda)
-library(SnowballC)
-library(ggplot2)
-library(LaF)
-library(plyr)
-library(dplyr)
-library(tidyr)
-library(plotly)
-library(data.table)
-library(stringi)
-library(hunspell)
-library(gridExtra)
-library(viridis)
-library(RColorBrewer)
+#setwd('~/Studies/Coursera/10-Capstone/corpus/en_US/')
+ library(knitr)
+# library(readtext)
+ library(quanteda)
+# library(SnowballC)
+# library(ggplot2)
+ library(LaF)
+# library(plyr)
+# library(dplyr)
+# library(tidyr)
+# library(plotly)
+ library(data.table)
+# library(stringi)
+# library(hunspell)
+# library(gridExtra)
+# library(viridis)
+ library(RColorBrewer)
 ```
 
-
 ##Abstract
-In this project we will try to develop next word prediction system at typing. For this task we are provided by the JHU partner swiiftkey with data  
-The data provided  
+In this project we will try to develop a word prediction system at typing. For this task we are provided by the JHU partner [SwiftKey](https://www.microsoft.com/en-us/swiftkey) with a large corpus of texts. We are supposed to use these texts to extract some frequent combinations of words we use in daily life to build our prediction algorithm from.  
  
 ## Summaries
-First, let's see the scale of the problem.  
-Since the files are very large and R is only able to work in-memory, I will use operating system's wc operation to count lines, words and characters.
+First, let's see the scale of the problem. Since the files are very large and R is only able to work in-memory, I will use operating system's wc operation to count lines, words and characters.
     
 ```{r summaries, echo=FALSE, cache=T}
 
@@ -71,157 +68,132 @@ kable(files, row.names = F,format.args = list(decimal.mark = ".", big.mark = ","
 ```
  
 As one can see the numbers are truly enormous. I will try to use a 1% of the lines to perform some preliminary analyses.
-
+Also, looking ahead, running the analysis on all three files yelded pretty much similar results, so I will present it for only 'en_US.blogs.txt' file to avoid clogging up the report with duplicate information.
 
 ##Creating corpus
-  Read a limited random sample of text file   
-```{r}
+```{r oneprcent , echo = F}
 oneprc <- round(files$lines * .1, -3) 
 names(oneprc)<- files$file
-
 kable(oneprc, col.names = "1%")
 ```  
-  A 100,000 lines seems to be a reasonable sample. Also, I will perform analysis on one of the files, since text is always text.
-  Then convert everything to lowerCase and remove foreign languages characters (non-ASCII characters)
-  
-  create corpus
- 
-```{r Corpus}
- 
 
-if (is.na(get_lines('en_US.twitter.txt',1:2)[1])) # check that I can read from file
+For each file 1% of the lines is roughly 100,000 lines, a sizeable sample, but not too big, allowing to execute operations in a matter of seconds and without heavy load on memory. 
+So in this step I:  
+-Read 100,000 random lines from a file  
+-Convert everything to lower case and remove foreign languages (non-ASCII) characters  
+-Create corpus object  
+ 
+```{r Corpus, comment=NA, cache=T }
+currentFile = 'en_US.blogs.txt'
+if (is.na(get_lines(currentFile,1:2)[1])) # check that I can read from file
   stop("couldn't read from file. probably path is wrong")
-
 set.seed(42)
-currentFile = 'en_US.twitter.txt'
 Lines <- sample_lines(currentFile, 100000, files[currentFile,]$lines) #sample some lines from a file
-
 Encoding(Lines) <- "latin1"  #remove non-ascii chars 
 Lines <- iconv(Lines, "latin1", "ASCII", sub="")
-
 Corp <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
-
 paste(head(texts(Corp)))
-
 ```
 
- read profanity vocabulary and convert to lower
+##Tokenization
+Creating word tokens, while removing unwanted tokens:  
+  - numbers  
+  - punctuation  
+  - symbols  
+  - separators  
+  - hyphens  
+  - URLs  
+  - twitter tags (but leaving the word after # in #hashtag)  
 
-```{r profane}
-l <- determine_nlines('profanity_words.txt')
+```{r Tokens, cache=T}
+Toks<- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
+  remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
+```  
+
+And:  
+  - twitter rt tag  
+  - english stopwords  
+  - profane words  
+  
+```{r stopwords_and_profane, cache=T}
+l <- determine_nlines('profanity_words.txt') #read profanity vocabulary and convert to lower
 profane <-char_tolower(get_lines('profanity_words.txt', 1:l))
 profane <- profane[!is.na(profane)]
-```
-
-
-  
-##Creating word tokens, while removing unwanted tokens:  
-    - numbers  
-    - punctuation  
-    - symbols  
-    - separators  
-    - hyphens  
-    - url 
-    - twitter (leaving the word after # in #hashtag)  
-    - twitter rt tag
-    - english stopwords  
-    - profane words  
-    
-```{r}
-Toks<- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T,
-  remove_symbols = T, remove_separators = T,
-  remove_twitter = T, remove_hyphens = T, remove_url = T)
 Toks<- tokens_remove(Toks, c(stopwords("english"), profane, "rt"))  # also remove ReTweet tag
-```
-    
-    
+```    
+#Stemming  
+Stemming is an operation of converting word to its root form. Example: caresses -> caress.  
 I decided not to do stemming because:  
-  - it converts some words in a strange manner  
-  - the model will output stemmed words as prediction which is undesired behaviour   
+  - it converts some words in a strange manner, like: ponies -> poni.  
+  - the model will output stemmed words as prediction which is undesirable.  
     
 ##Document Frequency Matrix  
-
+A DFM is a matrix that stores number of appearances of each token. Essentially, it extracts all the unique words from a text together with total number of appearances of this word. At this step DFM is useful to spot unwanted words. 
   
-```{r}
-
-Dfm1gr <- dfm(Toks, tolower = TRUE, stem = F) # no stemming required i think
-
-
-#tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
-
-
+```{r 1-gram_DFM, cache=T}
+Dfm1gr <- dfm(Toks, tolower = TRUE, stem = F) 
 ```
   
 ###Check that non-ASCII characters actually got removed  
-  If present, these chars should be immediately seen at the beginning or at the end of sorted tokens list.
+  If present, these chars should be immediately seen at the beginning or at the end of sorted tokens list.  
   
-```{r echo=FALSE}
-# with this you can check if there are some non-ascii chars remaining in dfm like chinese or russian 
-rs <-colSums(Dfm1gr) # maybe its betteer to use docfreq()
-rs <- data.frame(word = names(rs), freq = rs)
-tf <- rs[order(rs$freq, decreasing = T ),]
-lvls <- levels(rs$word)
-n = 1
-#lvls[n:(n+100)]
+```{r nonASCII_check ,echo = F}
+features <- Dfm1gr@Dimnames$features
+lvls <- features[order(features)]
 cat(head(lvls,50), sep ="; ")
 cat(tail(lvls,50), sep ="; ")
 ```
-And I see that there are none. Even though there are some pseudo-words here, like "100,00th", these will be filtered out as having too low a frequency in the Document Feature Matrix.
+And I see that there are none. Even though there are some pseudo-words here, like "100,00th", these will be filtered out at a later step as having too low a frequency in the n-grams.
 
 ##Statistics
 Since the data is very big, I have to find ways to make it smaller. 
-Intuition tells me that 
-One way is to filter out terms that are of very low frequency. 
-For this I need to determine how much data I need to cover 50% and 90% of the words
+First of all, it will become smaller due to structure of the model which compressees the data to just a database of unique tokens with their frequencies. 
+Another way is to filter out terms that are of very low frequency.  
+For this I need to determine how much data can be filtered out and still cover 90% of the words.
 
   
-```{r}
+```{r coverage_graph, cache=T}
 freq1gr <- colSums(Dfm1gr)
 freq1gr <- data.frame(words = names(freq1gr), freq = freq1gr , stringsAsFactors = F)
-freq1gr  <- freq1gr[order(freq1gr$freq, decreasing = T ),]
+freq1gr  <- freq1gr[order(freq1gr$freq, decreasing = T),]
 freq1gr$wc <- 1:nrow(freq1gr)
 freq1gr$cs <- cumsum(freq1gr$freq)
 freq1gr$perc <- freq1gr$cs/tail(freq1gr$cs,1)
 
-closest <- function(w,x)
+closest <- function(w,x) #find closest value to x in a vector w. w must be sorted.
 {
   dt = data.table(w, val = w) 
   setattr(dt, "sorted", "w")
   return(dt[J(x), .I, roll = "nearest", by = .EACHI])
 }
 
-#cl <-rbind( closest(freq1gr$perc,.5),closest(freq1gr$perc,.9),closest(freq1gr$perc,.99))
-
 cl<-closest(freq1gr$perc,c(.5, .9, .99))
-
 cl$p <- round((cl$I/nrow(freq1gr))*100)
-
 cl$col <- brewer.pal(3, "Set1")
-
 coverage <- ggplot(data = freq1gr ,aes(x = wc, y = perc)) + geom_line() +
               geom_hline(aes(yintercept =  w, col = col),data = cl, show.legend = F)  +
-              geom_label(aes(x = I, y = w+.04, label=paste(I, " ≈ ", p ,"%"), col = col ), data = cl, show.legend = F) + xlab("num of unique words") + ylab("% most frequent tokens") #+ brewer.pal(7, "BrBG")  #scale_fill_brewer(palette="Dark2")
-
+              geom_label(aes(x = I, y = w+.04, label=paste(I, " ≈ ", p ,"%"), col = col ), data = cl, show.legend = F) + xlab("num of unique words") + ylab("% most frequent tokens") 
 coverage
 ```
   
-So I see that the coverage graph grows very fast which means that about 20% most frequent tokens cover 90% of all unique words in a 100k lines sample. 
-  
+So I see that the coverage graph grows very fast. About 20% most frequent tokens cover 90% of all unique words in a 100k lines sample.  
   
 ##N-grams
-N-grams are a sequences of n words taken from a corpus and incorporated as a single token.
-So if a corpus was "The quick brown fox jumps over the lazy dog" then 3-grams for it would be:
+N-grams are a sequences of n words taken from a text and incorporated as a single token.  
+So if a text was "The quick brown fox jumps over  another quick brown fox" then 3-grams for it would be:
 
-```{r echo=FALSE}
-fox = "The quick brown fox jumps over the lazy dog "
-dfoxm = tokens(fox,ngrams = 3, remove_number =T)
+```{r brown_fox, echo=FALSE}
+fox = "The quick brown fox jumps over another quick brown fox"
+foxtok = tokens(fox,ngrams = 3, remove_number =T)
 myfun <- function(x) {paste("\n", strrep(" ",cumsum(nchar(x)+1)))}
 lal <- sapply(strsplit(fox," "),myfun)
-cat(unlist(dfoxm), sep = lal)
+cat(unlist(foxtok), sep = lal)
 ```
   
-  
-```{r}
+The next step is to create Document-feature matrix (DFM) out of these 3-grams. So for example in the case of 3-grams each token represents 3 consecutive words. So all the tokens in our example will have 1 appearance except for "quick_brown_fox", which will have 2.
+
+I will create 1, 2 and 3-grams for the document to get the general picture of the data. 1-gram is just dfm of single words which I've already created earlier. 
+```{r 2_3_grams, cache=T}
 bigrams <- tokens_ngrams(Toks, 2)
 trigrams <- tokens_ngrams(Toks, 3)
 
@@ -230,19 +202,17 @@ Dfm3gr <- dfm(trigrams, tolower = TRUE, stem = F)
 ```
 
   
-A plot of most frequent 1,2,3-grams shows us that even such simple algorithm is indeed able to locate most frequent combinations of words we use in daily life.  
+A plot of most frequent 1,2,3-grams shows us that even such simple algorithm is indeed able to locate frequent combinations of words we use in daily life.  
   
   
-```{r}
-knitr::opts_chunk$set(fig.width = 9)
+```{r plot_ngrams, cache=T}
+
 tf <- topfeatures(Dfm2gr,30, scheme =  "count")
 tf2 <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
 
 tf <- topfeatures(Dfm3gr,30, scheme =  "count")
 tf3 <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
-
-
-                     
+                   
 plt1grm <- ggplot(head(freq1gr,30), aes(x=reorder(words, freq), y=freq)) + 
         geom_bar(stat="Identity", fill='red') + xlab("") +
         coord_flip() + ylab("Number of Appearances") + ggtitle("most frequent 1grams") 
@@ -255,14 +225,30 @@ plt3grm <- ggplot(head(tf3,30), aes(x=reorder(words, freq), y=freq)) +
         geom_bar(stat="Identity", fill='red') + xlab("") +
         coord_flip() + ylab("Number of Appearances") + ggtitle("most frequent 3grams") 
       
-
-  
 grid.arrange(plt1grm, plt2grm, plt3grm, ncol=3)
 
 ```
 
 
+```{r save_ngrams, eval=FALSE, include=FALSE}
+save(Dfm1gr,Dfm2gr,Dfm3gr, file = "123grams.rData")
+```
 
+
+## Next steps
+
+So judging from this overview, a straightforward solution to the project's goal seems simple:  
+-Pre-calculate a frequencies database for all 1,2,3,4, maybe 5-grams.  
+-For every new word in a sequence that a user types, find in the database all n-grams that begin similarly  
+-Calculate a degree of fit for every found n-gram according to some formula  
+-Select n-gram with best fit.  
+
+## Implementation
+
+Since the given data is truly enormous and can't fit into memory, I will have to process it in chunks, saving only ngrams and frequencies in an SQL database.
+
+## Conclusion 
+In this report I have performed a brief overview of the data that is avilable and arrived at an idea as to how it may be useful for creating a prediction model. 
 
 
 
