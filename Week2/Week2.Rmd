@@ -18,6 +18,7 @@ library(tidyr)
 library(plotly)
 library(data.table)
 library(hunspell)
+library(sqldf)
 ```
 
 
@@ -96,19 +97,26 @@ tail(profane)
 
 ```
 
+```{r}
+
+```
+
 
 #Search for keywords in context
 ```{r}
-#what = " +(rt) +"
-what = "ぶ"
-#what =  "#\\w+" 
+#what = " +(rt) +" # finds ReTweet tag. Don't really need it. Just do remove_tokens("rt")
+# "(^|( +))(RT|rt)($| *:| +)" more advanced regex to find (ReTweet) tag. 
+#what = "ぶ" #Finds non-english chars
+#what =  "#\\w+" #Finds #hashtags
 #phrase <- tokens(corpus(what), what = "word")
-context <- kwic(twitCorp ,pattern = what, window = 50, case_insensitive = T, valuetype = "regex")
 
-txts <- twitCorp[context$docname]
+what = "_"
+context <- kwic(Corp ,pattern = what, window = 50, case_insensitive = T, valuetype = "regex")
+
+txts <- Corp[context$docname]
 htags <- context$keyword
 head(htags, 20)
-txts
+head(txts)
 ```
 
 ```{r}
@@ -134,7 +142,7 @@ View(cbind(withnums, wihtoutnums))
 
 
 ```{r}
-# My attempt to create Twitter Hashtags segmentation algorithm 
+# My attempt to create Twitter Hashtags segmentation algorithm. not finished 
 source('~/Studies/Coursera/10 - Capstone/DSS_Capstone/Week2/hastags.r')
 ```
 
@@ -172,7 +180,6 @@ enUStok <- tokens(enUS, what = "word", remove_numbers = T, remove_punct = T,
 twitter_data <- stri_trans_general(twitter_data, "latin-ascii") #remove non-ASCII characters
 
 
-# "(^|( +))(RT|rt)($| *:| +)"  regex to find RT (ReTweet) tag. Dont really need it. just remove_tokens("rt")
 
 
 toks <- tokens(enUS80k, what = "word", remove_numbers = T, remove_punct = T,
@@ -198,7 +205,7 @@ lvls[from:(from+100)]
 
 ```{r}
 
-Dfmtoks80k <- dfm(toks, tolower = TRUE, stem = F) # no stemming required i think
+Dfmtoks80k <- dfm(toks, tolower = TRUE, stem = F) 
 tf <- topfeatures(Dfmtoks80k,1000, scheme =  "docfreq")
 
 tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
@@ -211,7 +218,7 @@ Plot
 
 
 ```{r}
-Dfm2grm80k <- dfm(bigrams, tolower = TRUE, stem = F) # no stemming required i think
+Dfm2grm80k <- dfm(bigrams, tolower = TRUE, stem = F) 
 tf <- topfeatures(bigramsDfm,1000, scheme =  "docfreq")
 
 tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
@@ -225,7 +232,7 @@ Plot
 
 ```{r}
 ngrams <- tokens_ngrams(toks, n = 3)
-trigramsDfm <- dfm(ngrams, tolower = TRUE, stem = F) # no stemming required i think
+trigramsDfm <- dfm(ngrams, tolower = TRUE, stem = F) 
 tf <- topfeatures(trigramsDfm,50, scheme =  "docfreq")
 
 tf <- data.frame(words = names(tf), freq = tf , stringsAsFactors = F)
@@ -321,7 +328,7 @@ fcm_select(myfcm, feat, verbose = FALSE) %>%
 
 
 
-# get number of lines. there is a  determine_nlines function in the LaF package and its 52 times faster.
+# get number of lines. there is a determine_nlines function in the LaF package and its 52 times faster.
 ```{r }
 nlines <- function(filename )
 {
@@ -400,12 +407,28 @@ load("~/Studies/Coursera/10-Capstone/corpus/en_US/123grams.rData")
 ```
 
 
+```{r}
+cS<-colSums(Dfm2gr)
+bgfreq <- data.frame(words = names(cS), freq = cS , stringsAsFactors = F)
+tfm <- bgfreq %>% separate(col=words, sep = "_", into =c("word1", "word2"),remove =T)
+object.size(tfm)
+```
+
+```{r} 
+#oops there is a problem: some tokens didn't get split beacuse some tokens have more than one underscore.
+#reason: there were underscores in raw data, usually instead of a whitespace, so the tokenizer failed to split the words and I had word tokens like "look_tired". 
+wrn <- c(46088, 46089, 64882, 83497, 100158, 115136, 118818, 118819, 126345, 126347, 161493, 161494, 171207, 171977, 171979, 242558, 258300, 352877, 372766, 372768)
+cS[wrn]
+
+```
+
+
 
 ```{r}
 #POC: compressing the data using SQL indexing
 
 #tfm is output of topFeatures() of bigrams 
-tfm <- subset(tfm, select = -c(words)) #I dont need words column, it's just word1_word2, should remove it even at an earlier step.
+#tfm <- subset(tfm, select = -c(words)) #I dont need words column, it's just word1_word2, should remove it even at an earlier step.
 
 #words is a parent table of all the unique words in a corpus 
 words <- (unique(c(tfm$word1, tfm$word2)))
@@ -428,23 +451,97 @@ check = sqldf("select w1.word as w1, w2.word as w2, bigrams.freq
                             join words w2 on (w2.id == bigrams.word2) ")
 
 colSums(check == tfm) # sums of all columns must be equal to tfm's length
-
+dim(tfm)
 #demonstrate that this approach really compresses the data 3 times.
 object.size(tfm)/(object.size(words) + object.size(bigrams)) 
 
-
+sqldf("attach 'mydb' as new") 
+sqldf("create table bg as select * from bigrams", dbname = "mydb")
+sqldf("create table wd as select * from words", dbname = "mydb")
+sqldf("create table tfmdb as select * from tfm", dbname = "mydb")
+sqldf("create table bi_grams as select * from bgfreq", dbname = "mydb")
+sqldf("select * from bg", dbname = "mydb")
 ```
 
 
 ```{r}
 # This is how I will search for bigram
+tic <- Sys.time()
 lal <- sqldf("select w1.word as w1, w2.word as w2, bigrams.freq
               from bigrams join words w1 on (w1.id == bigrams.word1)
                            join words w2 on (w2.id == bigrams.word2) 
               where w1 ='year' and w2 like 'ago'")
+toc <- Sys.time()-tic
+print(toc)
 lal
 ```
 
+```{r}
+# This is how I will search for bigram
+tic <- Sys.time()
+  lal <- sqldf("select w1.word as w1, w2.word as w2, bg.freq
+                from bg join wd w1 on (w1.id == bg.word1)
+                             join wd w2 on (w2.id == bg.word2) 
+                where w1 ='year' and w2 like 'ago'", dbname = "mydb")
+toc <- Sys.time()-tic
+print(toc)
+lal
+```
+
+```{r}
+# This is how I will search for bigram
+tic <- Sys.time()
+lal <- sqldf("select  w1.word as wd1, w2.word as wd2, bg.freq
+              from bg join wd w1 on ( bg.word1 = w1.id)
+                      join wd w2 on ( bg.word2 = w2.id ) 
+              where wd1 ='hello' and wd2 = 'darlin' ", dbname = "mydb")
+toc <- Sys.time()-tic
+toc
+print(lal)
+```
+
+```{r}
+# This is how I will search for bigram
+tic <- Sys.time()
+lal <- sqldf("select * from tfmdb 
+             where word2 = 'fit'", dbname = "mydb") 
+      #        where freq = 345", dbname = "mydb")
+
+       #       where word1 ='year'", dbname = "mydb")
+toc <- Sys.time()-tic
+print(toc)
+lal
+```
+
+
+```{r}
+# This is how I will search for bigram
+tic <- Sys.time()
+lal <- sqldf("select * from bi_grams 
+             where words like '%\\_fit' escape '\\'", dbname = "mydb") 
+      #        where freq = 345", dbname = "mydb")
+
+       #       where word1 ='year'", dbname = "mydb")
+toc <- Sys.time()-tic
+print(toc)
+dim(lal)
+lal
+```
+
+
+```{r}
+# This is how I will search for bigram
+tic <- Sys.time()
+lal <- sqldf(c("update bi_grams set freq = freq + inc.freq where words = (select * from bi_grams where words like '%\\_fit' escape '\\') inc ", 
+              "select * from bi_grams where words like '%\\_fit' escape '\\'"), dbname = "mydb") 
+      #        where freq = 345", dbname = "mydb")
+
+       #       where word1 ='year'", dbname = "mydb")
+toc <- Sys.time()-tic
+print(toc)
+dim(lal)
+lal
+```
 
 
 

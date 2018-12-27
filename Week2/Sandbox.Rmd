@@ -103,13 +103,62 @@ freq[tail(ord)]
 
 
 
+```{r}
+# define DF1 and DF2 as before
+set.seed(1)
+n <- 1000000
+DF1 <- data.frame(a = sample(n, n, replace = TRUE), 
+   b = sample(4, n, replace = TRUE), c1 = runif(n))
+DF2 <- data.frame(a = sample(n, n, replace = TRUE), 
+   b = sample(4, n, replace = TRUE), c2 = runif(n))
+
+# combine all sqldf calls from before into one call
+
+sqldf(c("create index ai1 on main.DF1(a, b)", 
+  "create index ai2 on main.DF2(a, b)"))
+system.time(sqldf("select * from main.DF1 natural join main.DF2"))
+```
+
+
+```{r}
+authors <- data.frame(
+    surname = I(c("Tukey", "Venables", "Tierney", "Ripley", "McNeil")),
+    nationality = c("US", "Australia", "US", "UK", "Australia"),
+    deceased = c("yes", rep("no", 4)))
+books <- data.frame(
+    name = I(c("Tukey", "Venables", "Tierney",
+             "Ripley", "Ripley", "McNeil", "R Core")),
+    title = c("Exploratory Data Analysis",
+              "Modern Applied Statistics ...",
+              "LISP-STAT",
+              "Spatial Statistics", "Stochastic Simulation",
+              "Interactive Data Analysis",
+              "An Introduction to R"),
+    other.author = c(NA, "Ripley", NA, NA, NA, NA,
+                     "Venables & Smith"))
+authors
+books
+(m1 <- merge(authors, books, by.x = "surname", by.y = "name", all =T))
+```
 
 
 
+```{r}
+x <- data.frame(k1 = c(NA,NA,3,4,5), k2 = c(1,NA,NA,4,5), data = 1:5)
+y <- data.frame(k1 = c(NA,2,NA,4,5), k2 = c(NA,NA,3,4,5), data = 1:5)
+merge(x, y, by = c("k1","k2")) # NA's match
+merge(x, y, by = "k1") # NA's match, so 6 rows
+merge(x, y, by = "k2", incomparables = NA) # 2 rows
+
+```
 
 
-
-
+```{r}
+(dt1 <- data.table(A = letters[1:10], X = 1:10, key = "A"))
+(dt2 <- data.table(A = letters[5:14], X = 7:16, key = "A"))
+merge(dt1, dt2)
+merge(dt1, dt2, all = TRUE)
+```
 
 
 

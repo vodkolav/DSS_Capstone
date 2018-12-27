@@ -1,0 +1,213 @@
+---
+title: "Milestone Report"
+author: "Michael Berger"
+date: "2 December 2018"
+output: 
+  html_document: 
+    fig_height: 7
+    fig_width: 11
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(include = FALSE)
+knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/corpus/en_US/')
+#setwd('~/Studies/Coursera/10-Capstone/corpus/en_US/')
+ library(knitr)
+# library(readtext)
+ library(quanteda)
+# library(SnowballC)
+ library(ggplot2)
+ library(LaF)
+ library(plyr)
+ library(dplyr)
+# library(tidyr)
+# library(plotly)
+ library(data.table)
+# library(stringi)
+# library(hunspell)
+# library(gridExtra)
+# library(viridis)
+ library(RColorBrewer)
+```
+
+    
+```{r summaries, echo=FALSE, cache=T}
+
+wc <- function(path)
+{
+    size <- round(file.size(path)/(2^20))
+    path = paste("'",path, "'", sep = "")
+    w1 <- system(paste("wc -lwc",path), intern=TRUE)
+    
+    wsplit <- unlist(strsplit(w1," +"))
+    wnum <-as.numeric(wsplit[2:4])
+    return(data.frame('file' = wsplit[5], 'size,MiB' = size, 'lines'=wnum[1], 'words'=wnum[2], 'chars'=wnum[3], stringsAsFactors = F))
+}
+
+files = list.files(".",pattern = "en*", full.names = F)
+
+files = lapply(files, FUN = wc)# determine_nlines)
+
+#filesbk <- files #files <- filesbk  , stringsAsFactors = F
+
+files <- data.frame(ldply(files, rbind))
+rownames(files) = files$file
+
+files[nrow(files)+1,2:5] <- apply(files[,2:5],2,sum)
+files[nrow(files),1] <- "Total"
+
+files$wordsPerLine <- round(files$words/files$lines)
+files$charsPerLine <- round(files$chars/files$lines)
+
+kable(files, row.names = F,format.args = list(decimal.mark = ".", big.mark = ","))
+```
+ 
+
+
+ 
+```{r Corpus, comment=NA}
+l <- determine_nlines('profanity_words.txt') #read profanity vocabulary and convert to lower
+profane <-char_tolower(get_lines('profanity_words.txt', 1:l))
+profane <- profane[!is.na(profane)]
+
+sample_and_freq <- function(filename ,line_numbers)
+{
+  tic <- Sys.time()
+  if (is.na(get_lines(filename,1:2)[1])) # check that I can read from file
+  {
+    print(paste("can't read from file", filename))
+    stop()
+  }
+
+  Lines <- get_lines(filename, line_numbers) #sample some lines from a file
+  Encoding(Lines) <- "latin1"  #remove non-ascii chars 
+  Lines <- iconv(Lines, "latin1", "ASCII", sub="")
+  Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
+  Corp <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
+  
+  Toks<- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
+  remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
+  
+  Toks<- tokens_remove(Toks, c(stopwords("english"), profane, "rt"))  # also remove ReTweet tag
+  
+  bigrams <- tokens_ngrams(Toks, 2)
+  Dfm2gr <- dfm(bigrams, tolower = TRUE, stem = F)
+  cS<-sort(colSums(Dfm2gr), decreasing = T)
+  Freq2gr <- data.frame(words = names(cS), freq = cS , stringsAsFactors = F)
+  print(paste(line_numbers[1], Sys.time()-tic), sep = "| ")
+  return(Freq2gr) #(cS)#
+}
+```
+
+```{r}
+path <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
+currFile <- 'en_US.blogs.txt'
+
+sampSize = 1e3 #1e4 # 
+nslices = floor(files[currFile,]$lines / sampSize) #upper boundary for processing loop
+up_to = nslices # 10 #
+Freq1gr <- data.frame(words = character(), freq = numeric(), stringsAsFactors = F)
+toc <- numeric()
+
+stoks <- numeric() #num of toks at each iteation 
+ttoks<- numeric() #num of toks in merged data.frame
+
+
+tic <- Sys.time()
+for (i  in 890:nslices) # 900)#
+{
+
+  lnums <- (i*sampSize+1):((i+1)*sampSize)
+  c(head(lnums),'...',tail(lnums))
+  Freq1gr2 <- sample_and_freq(paste(path,  currFile, sep = ''), lnums)
+  stoks <- c(stoks, dim(Freq1gr2)[1])
+   
+  Freq1gr<-merge(Freq1gr,Freq1gr2, by.x = "words", by.y = "words", all =T)
+  Freq1gr[is.na(Freq1gr)] <-0 #probably should do it with only numeric columns for speed
+  Freq1gr <- mutate(Freq1gr, freq = freq.x + freq.y)
+  Freq1gr <- Freq1gr[c("words","freq")]
+  ttoks <- c(ttoks, dim(Freq1gr)[1])
+  toc <- c(toc, Sys.time())
+  print(Sys.time() - tic)
+}
+
+
+plot( toc - toc[1])
+
+
+g <- ggplot() + geom_line(aes(x = 1:up_to, y = cumsum(stoks)) , color = "red") +
+                geom_line(aes(x = 1:up_to, y = c(0,ttoks)), color = "blue" ) 
+g
+
+object.size(Freq1gr)
+
+Freq1gr <- Freq1gr[order(Freq1gr$freq , decreasing = T  ),]
+
+#save(Freq1gr, toc, stoks, ttoks, file = "Freq2gr.rData")
+
+j = 1050
+Freq1gr[j:(j+50),]
+
+plot(head(Freq1gr$freq, 4000))
+
+sum(Freq1gr$freq >5)
+sum(Freq1gr$freq >4)
+```
+
+```{r}
+currFile <- 'en_US.blogs.txt'
+#sampSize = 1e4 #1e5
+nslices = ceiling(files[currFile,]$lines / sampSize) #upper boundary for processing loop
+ 
+# for (i  in 1:2)#nslices)
+# {
+#   
+# }
+sampSize = 1e3 #1e3 #
+i = 4
+lnums <- (i*sampSize+1):((i+1)*sampSize)
+c(head(lnums),'...',tail(lnums))
+Freq1gr1 <- sample_and_freq(currFile, lnums)
+object.size(Freq1gr1)
+
+
+i = 5
+lnums <- (i*sampSize+1):((i+1)*sampSize)
+c(head(lnums),'...',tail(lnums))
+Freq1gr2 <- sample_and_freq(currFile, lnums)
+object.size(Freq1gr2)
+
+
+
+Freq1gr<-merge(Freq1gr1,Freq1gr2, by.x = "words", by.y = "words", all =T)
+Freq1gr[is.na(Freq1gr)] <-0 #probably should do it with only numeric columns for speed
+Freq1gr <- mutate(Freq1gr, freq = freq.x + freq.y)
+Freq1gr <- Freq1gr[c("words","freq")]
+
+object.size(Freq1gr)/(object.size(Freq1gr1)+object.size(Freq1gr2))
+
+
+wat1 <- head(Freq1gr1,50)
+wat2 <- head(Freq1gr2,50)
+
+watu<-merge(wat1,wat2, by.x = "words", by.y = "words", all =T, incomparables=NULL)
+
+
+1+NA
+c(wat1,wat2)
+merge()
+Lines <- get_lines('/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/en_US.blogs.txt', 1:2)
+head(Lines)
+```
+
+
+
+
+
+```{r save_ngrams, eval=FALSE, include=FALSE}
+save(Dfm1gr,Dfm2gr,Dfm3gr,files,tfm, file = "123grams.rData")
+```
+
+
+
+
