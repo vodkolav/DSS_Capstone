@@ -41,29 +41,66 @@ ngramize <-function (n, Toks, FreqBig)
   FreqThis <- data.table(word = names(cS), freq = cS , stringsAsFactors = F, key = "word")
   #FreqThis <- FreqNgr1$gr2
   
+  #separate single column word = "hello_my_dear_friend" ...
+  #into n columns:  |word1 = "hello"| word2 = "my"| word3 = "dear"| word4 = "friend"|
   wordCols <- paste("word", 1:n, sep = '')
   FreqThis <- FreqThis %>% separate(col=word, sep = "_", into = wordCols ,remove =T)
- 
-  #find ids of each first word in parent table 
-  # word1 <- sqldf("select Id, word from words, FreqThis where (words.word == FreqThis.word1)", dbname = "ngrams")
-  # FreqThis$word1 <- word1$Id
-  # 
-  # word2 <- sqldf("select Id, word from words, FreqThis where (words.word == FreqThis.word2)", dbname = "ngrams")
-  # FreqThis$word2 <- word2$Id
   
-  for (i in 1:n)
+  for (i in 1:n) #replace words in FreqThis with their Ids from an index of unique words.
   {
     wordi <- sqldf(paste("select Id, word from words, FreqThis where (words.word == FreqThis.word",i, ")", 
                          sep = ""), dbname ="ngrams")
     FreqThis[,(wordCols[i]) := wordi$Id]
   }
-  #FreqBig<-merge(FreqBig[[paste("gr",n,sep = '')]],FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
-  FreqBig<-merge(FreqBig,FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
-  FreqBig[is.na(FreqBig)] <-0 #probably should do it with only numeric columns for speed
-  FreqBig <- mutate(FreqBig, freq = freq.x + freq.y)
+
+  attr(FreqThis,"table") <- paste("gram",n,sep = '')
+  #merge new calculated ngrams into database
+  merge_gram(FreqThis)
   
-  return(select(FreqBig, -c("freq.x", "freq.y")))
+  
+  #FreqBig<-merge(FreqBig[[paste("gr",n,sep = '')]],FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
+  # FreqBig<-merge(FreqBig,FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
+  # FreqBig[is.na(FreqBig)] <-0 #probably should do it with only numeric columns for speed
+  # FreqBig <- mutate(FreqBig, freq = freq.x + freq.y)
+  # 
+  # return(select(FreqBig, -c("freq.x", "freq.y")))
 }
+
+
+# updateTable <- function(grB)
+# {
+#   sqldf("create table gram2 as select * from grA", dbname = "ngrams")
+
+# }
+# updateTable(grB)
+
+selectStr <- function(keys) # build part of SQL where statement from data, eg: 'word1 = 4 and word2 = 734'
+{
+  wat <- paste(names(keys), "=" , keys)
+  wat <- paste(wat, collapse = ' and ')
+  return(wat)
+}
+
+merge_gram <- function(grB)
+{
+  table <- attr(grB,"table") # grB must arrive with attribute table set to ngram's table name, e.g gram2 / gram3, etc.
+  for (i in 1:nrow(grB))
+  {
+    inc <- grB[i,]
+    incKeys  <- select(inc,-c("freq"))
+    existing <- sqldf(paste("select * from ",table," where ", selectStr(incKeys)), dbname = "ngrams")
+    if (nrow(existing)==0)
+    {
+      sqldf(paste("insert into ",table," (", paste(names(inc), collapse = ","), ") values (",
+                  paste(inc, collapse = ","),")"), dbname = "ngrams")
+    }else
+    {
+      sqldf(paste("update ",table," set  freq = ", existing$freq + inc$freq , " where ", selectStr(incKeys)) , dbname = "ngrams")
+    }
+  }
+}
+
+#attr(grB,"order")
 
 
 
@@ -93,7 +130,10 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
   a[,(wordCols) := numeric(ngrO), by=freq]
   # FreqNgr <- list(a) # for compatibility I'll leave it as list of data.tables, but only one d.t will be there
   # names(FreqNgr) <- paste("gr",ngrO,sep = '') #stamp a names such as 'gr2', 'gr3' etc to each data.table in a list 
-  FreqNgr <- a
+  #FreqNgr <- a
+  
+  
+  #TODO: create table in database if doesnt exist
   
   
   for (currFile in files[-4,]$file)
@@ -123,13 +163,13 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
                   lnums[1], " - ", tail(lnums,1),toc))
       
       Toks <- sample_and_toks(filename, lnums)
-      FreqNgr <- ngramize(ngrO, Toks, FreqNgr)
+      ngramize(ngrO, Toks, FreqNgr)
       
       #FreqNgr <- parLapply(cl, ngO, ngramize, Toks, FreqNgr)
-      
-      ob <-dim(FreqNgr)[1]
-      obs <- c(obs, ob)
-      print(paste(ob, "unique tokens| ", object.size(FreqNgr), " bytes"))
+      # 
+      # ob <-dim(FreqNgr)[1]
+      # obs <- c(obs, ob)
+      # print(paste(ob, "unique tokens| ", object.size(FreqNgr), " bytes"))
       elapsed <- c(elapsed, difftime(Sys.time(), tic, units = "mins"))
     }
     #stopCluster(cl)
@@ -142,8 +182,8 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
     #profvis(prof_input = "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/file4fce8ccb11c.Rprof")
     
   }
-  save(FreqNgr,obs, file = paste(path, ngrO, "grams." ,env, ".allFiles.rData", sep = ''))
-  return(list(FreqNgr,obs))
+  #save(FreqNgr,obs, file = paste(path, ngrO, "grams." ,env, ".allFiles.rData", sep = ''))
+  #return(list(FreqNgr,obs))
 }
 
 # tmp <- ngrams(path, sampSize = 5e2, ngrO = 2, env = "test" )
