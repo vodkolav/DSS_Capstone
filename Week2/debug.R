@@ -1,9 +1,7 @@
-setwd('~/Studies/Coursera/10-Capstone/corpus/en_US/')
 
 l <- determine_nlines('profanity_words.txt') #read profanity vocabulary and convert to lower
 profane <-char_tolower(get_lines('profanity_words.txt', 1:l))
-profane <<- profane[!is.na(profane)]
-
+profane <- profane[!is.na(profane)]
 
 load(file = 'filesInfo.rData') #load information about files: specifically number of lines 
 
@@ -43,7 +41,8 @@ ngramize <-function (n, Toks, FreqBig)
   
   wordCols <- paste("word", 1:n, sep = '')
   FreqThis <- FreqThis %>% separate(col=word, sep = "_", into = wordCols ,remove =T)
- 
+  
+  
   #find ids of each first word in parent table 
   # word1 <- sqldf("select Id, word from words, FreqThis where (words.word == FreqThis.word1)", dbname = "ngrams")
   # FreqThis$word1 <- word1$Id
@@ -51,23 +50,59 @@ ngramize <-function (n, Toks, FreqBig)
   # word2 <- sqldf("select Id, word from words, FreqThis where (words.word == FreqThis.word2)", dbname = "ngrams")
   # FreqThis$word2 <- word2$Id
   
-  for (i in 1:n)
+  for (i in 1:n) #same as above, find ids of each first word in parent table, just for any n
   {
     wordi <- sqldf(paste("select Id, word from words, FreqThis where (words.word == FreqThis.word",i, ")", 
                          sep = ""), dbname ="ngrams")
     FreqThis[,(wordCols[i]) := wordi$Id]
+    # FreqThis[wordCols[i]] <- wordi$Id
   }
-  #FreqBig<-merge(FreqBig[[paste("gr",n,sep = '')]],FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
-  FreqBig<-merge(FreqBig,FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
-  FreqBig[is.na(FreqBig)] <-0 #probably should do it with only numeric columns for speed
-  FreqBig <- mutate(FreqBig, freq = freq.x + freq.y)
   
-  return(select(FreqBig, -c("freq.x", "freq.y")))
+  
+  
+  # FreqBig<-merge(FreqBig[[n]],FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
+  # FreqBig[is.na(FreqBig)] <-0 #probably should do it with only numeric columns for speed
+  # FreqBig <- mutate(FreqBig, freq = freq.x + freq.y)
+  
+  # return(FreqBig[c("word","freq")])
+  return(FreqThis)
+}
+
+
+DBinsert <- function(FreqNgr, tables)
+{
+  ques <- c(paste("insert into ", tables$big ,"  select * from FreqNgr", sep = " "),
+            paste("insert into ", tables$small ," (word1,word2, freq) 
+                  select  word1,word2, sum(freq) as freq
+                  from ", tables$big ,"
+                  group by word1,word2", sep = " "),
+            paste("delete from ", tables$big),
+            paste("select count(word1) from ", tables$small)
+            )
+  suppressWarnings(cnt<- sqldf(ques, dbname = "ngrams")[[1]])
+  obs <<- c(obs,cnt)
+  print(paste(cnt," 2grams"))
+  return(swap(tables))
+  
 }
 
 
 
+swap <- function(table)
+{
+  if (length(table)!=2) stop("table's length must be precisely 2!")
+  tmp <- table[1]
+  table[1] <- table[2]
+  table[2] <- tmp
+  return(table)
+}
 
+slices <- function(files,sampSize)
+{
+  #[currFile,]
+  files <- files[!(files$file == "Total"),] #drop the last line (Total)
+  return(floor(files$lines / sampSize)) #upper boundary for processing loop
+}
 
 #prof = NULL
 #prof <- profvis({
@@ -78,10 +113,10 @@ path <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
 sampSize = 5e4  #1e4 # how much lines to sample in a chunk
 ngrO = 1 #:5 # what Orders of ngrams you require
 
-ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
+ngrams <- function(path, sampSize = 5e3, ngrO = 1, env = "test" )
 {
   tic <- Sys.time()
-  obs <- numeric()
+  obs <<- numeric()
   elapsed <- Sys.time()
   
   #A list of data.tables each of which holds ngrams of its order
@@ -89,12 +124,18 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
   # FreqNgr <- rep(a, length(ngrO))
   
   wordCols <- paste("word", 1:ngrO, sep = '')
-  a <- data.table(freq = numeric()) 
-  a[,(wordCols) := numeric(ngrO), by=freq]
+  # a <- data.table(freq = numeric()) 
+  # a[,(wordCols) := numeric(ngrO), by=freq]
   # FreqNgr <- list(a) # for compatibility I'll leave it as list of data.tables, but only one d.t will be there
   # names(FreqNgr) <- paste("gr",ngrO,sep = '') #stamp a names such as 'gr2', 'gr3' etc to each data.table in a list 
-  FreqNgr <- a
+  # FreqNgr <- a
   
+  
+  totslices <- sum(slices(files, sampSize))
+  
+  tables <- if(totslices%%2==0){list(big = "tmp", small = "gram2") } else {list(big = "gram2", small = "tmp")}
+  
+  suppressWarnings(sqldf(paste("delete from ", tables), dbname = "ngrams"))
   
   for (currFile in files[-4,]$file)
   {
@@ -102,12 +143,14 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
     filename <- paste(path,  currFile, sep = '')
     
     sampSize <- ifelse(env=="test", 1e2, sampSize )
-    nslices = floor(files[currFile,]$lines / sampSize) #upper boundary for processing loop
+    #nslices = floor(files[currFile,]$lines / sampSize) #upper boundary for processing loop
     #rng = (nslices-1):nslices # 10 # for quick tests 
     #rng = 0:nslices # 10 # for full file run. must start at zero
     
-    rndslices <- ceiling(runif(1,0,nslices)) # smaple random place in data for testing
-    rng <- if(env=="test") (rndslices-1):rndslices else 0:nslices 
+    nslices <- slices(files[currFile,], sampSize)
+    
+    rndslices <- ceiling(runif(1,0,nslices)) # slect random line from data for testing
+    rng <- if(env=="test") (rndslices-2):rndslices else 0:nslices 
     
     
     #cl <- makeSOCKcluster(rep("localhost", length(ngO)))
@@ -122,14 +165,17 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
       print(paste("processing file ", substr(filename,56,nchar(filename)), "  lines ", 
                   lnums[1], " - ", tail(lnums,1),toc))
       
-      Toks <- sample_and_toks(filename, lnums)
+      Toks <- sample_and_toks(filename, lnums) # these two functions should be united
       FreqNgr <- ngramize(ngrO, Toks, FreqNgr)
+      rm(Toks)
+      
+      tables <- DBinsert(FreqNgr, tables)
       
       #FreqNgr <- parLapply(cl, ngO, ngramize, Toks, FreqNgr)
       
-      ob <-dim(FreqNgr)[1]
-      obs <- c(obs, ob)
-      print(paste(ob, "unique tokens| ", object.size(FreqNgr), " bytes"))
+      # ob <-dim(FreqNgr)[1]
+      # obs <- c(obs, ob)
+      # print(paste(ob, "unique tokens| ", object.size(FreqNgr), " bytes"))
       elapsed <- c(elapsed, difftime(Sys.time(), tic, units = "mins"))
     }
     #stopCluster(cl)
@@ -142,12 +188,13 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
     #profvis(prof_input = "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/file4fce8ccb11c.Rprof")
     
   }
-  save(FreqNgr,obs, file = paste(path, ngrO, "grams." ,env, ".allFiles.rData", sep = ''))
-  return(list(FreqNgr,obs))
+  #save(FreqNgr,obs, file = paste(path, ngrO, "grams." ,env, ".allFiles.rData", sep = ''))
+  #return(list(FreqNgr,obs))
+plot(elapsed[-1], obs, type = 'l')
+return(list(elapsed = unclass(elapsed[-1]), objects =obs))
 }
 
 # tmp <- ngrams(path, sampSize = 5e2, ngrO = 2, env = "test" )
 # FreqNgr <- tmp[[1]]
 # obs <- tmp[[2]]
 # plot(obs, type = 'l')
-

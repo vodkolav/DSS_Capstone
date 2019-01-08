@@ -3,8 +3,13 @@
 .Rapp.history
 
 # Session Data files
+**.rData
 **.RData
+**.Rprof
 **.rds
+**ngrams
+**profiling
+Week2/mydb
 Week2/Milestone_Report_files
 Week2/Milestone_Report_cache
 
@@ -39,6 +44,5 @@ vignettes/*.pdf
 rsconnect/
 .Rproj.user
 
-**profiling
-Week2/mydb
-Week2/debug.R
+
+

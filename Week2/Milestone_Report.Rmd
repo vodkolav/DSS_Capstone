@@ -87,7 +87,7 @@ So in this step I:
 currentFile = 'en_US.blogs.txt'
 if (is.na(get_lines(currentFile,1:2)[1])) # check that I can read from file
 set.seed(42)
-Lines <- sample_lines(currentFile, 100000, files[currentFile,]$lines) #sample some lines from a file
+Lines <- sample_lines(currentFile, 1e4, files[currentFile,]$lines) #sample some lines from a file
 Encoding(Lines) <- "latin1"  #remove non-ascii chars 
 Lines <- iconv(Lines, "latin1", "ASCII", sub="")
 Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
@@ -235,9 +235,10 @@ save(Dfm1gr,Dfm2gr,Dfm3gr,files,tfm, file = "123grams.rData")
 ```
 
 ## Questions to consider
-Here are some preprocessing steps which could further improve te model, but I decided to skip them because they will require a lot of time to develop.  
+Here are some preprocessing steps which could further improve the model, but I decided to skip them because they will require a lot of time to develop.  
 -Do a segmentation of twitter hashtags into separate words (like #hashtag -> hash tag) .
--substitute or remove tokens which start with a number (like "10,000th -> th" )
+-Substitute or remove tokens which start with a number (like "10,000th -> th" )
+-Maybe better not to remove stopwords since they are an essential part of speech and wothout them the sentences will be syntactically incorrect. 
 
 ## Next steps
 

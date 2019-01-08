@@ -162,6 +162,28 @@ merge(dt1, dt2, all = TRUE)
 
 
 
+```{r}
+
+
+set.seed(123)
+DT = data.table(x1 = rep(letters[1:2], 6),
+                x2 = rep(letters[3:5], 4),
+                x3 = rep(letters[5:8], 3),
+                y = rnorm(12))
+DT = DT[sample(.N)]
+DF = as.data.frame(DT)
+# dealing with factors
+fdt = DT[, c(lapply(.SD, as.factor), list(y=y)), .SDcols=x1:x3]
+fdf = as.data.frame(fdt)
+sdf = split(fdf, list(fdf$x1, fdf$x2))
+all.equal(
+    split(fdt, by=c("x1", "x2"), sorted=TRUE),
+    lapply(sdf[sort(names(sdf))], setDT)
+)
+```
+
+
+
 
 
 
