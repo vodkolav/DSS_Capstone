@@ -10,7 +10,8 @@ output:
 
 ```{r setup, include=FALSE}
 #knitr::opts_chunk$set(include = FALSE)
-knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/corpus/en_US/')
+#knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/DSS_Capstone/')
+data.dir <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
 
  library(knitr)
 # library(readtext)
@@ -75,35 +76,33 @@ Only create index of all unique words to get Ids for the ngrams words.
 This bit of code is highly diplicate, SO I need to unite it with same function for n>1 grams to shrink it.
 ```{r all_processing_functions}
 
-
-#setwd('~/Studies/Coursera/10-Capstone/corpus/en_US/')
-
-l <- determine_nlines('profanity_words.txt') #read profanity vocabulary and convert to lower
-profane <-char_tolower(get_lines('profanity_words.txt', 1:l))
+profane <- paste(data.dir,'profanity_words.txt', sep = "")
+l <- determine_nlines(profane) #read profanity vocabulary and convert to lower
+profane <-char_tolower(get_lines(profane, 1:l))
 profane <<- profane[!is.na(profane)]
 
 
-load(file = 'filesInfo.rData') #load information about files: specifically number of lines 
+load(file = paste(data.dir,'filesInfo.rData', sep = "")) #load information about files: specifically number of lines 
 
 #User Parameters:
-path <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
+
 #currFile <- 'en_US.blogs.txt'
-sampSize = 5e4  #1e4 # how much lines to sample in a chunk
-ngrO = 1 #:5 # what Orders of ngrams you require
+# sampSize = 5e4  #1e4 # how much lines to sample in a chunk
+# ngrO = 1 #:5 # what Orders of ngrams you require
 
 
 
 
-sample_and_toks <- function(filename ,line_numbers)
+sample_and_toks <- function(filepath ,line_numbers)
 {
   
-  if (is.na(get_lines(filename,1:2)[1])) # check that I can read from file
+  if (is.na(get_lines(filepath,1:2)[1])) # check that I can read from file
   {
-    print(paste("can't read from file", filename))
+    print(paste("can't read from file", filepath))
     stop()
   }
   
-  Lines <- get_lines(filename, line_numbers) #sample some lines from a file
+  Lines <- get_lines(filepath, line_numbers) #sample some lines from a file
   Encoding(Lines) <- "latin1"  #remove non-ascii chars 
   Lines <- iconv(Lines, "latin1", "ASCII", sub="")
   Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
@@ -202,8 +201,8 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
       
       toc <-difftime(Sys.time(), tic, units = "mins")
       toc <- paste("| ", sprintf("%.1f", toc ), " ", attr(toc, "units"), "elapsed")
-      #56 is lenth of path
-      print(paste("processing file ", substr(filename,56,nchar(filename)), "  lines ", 
+      # substr(filename,56,nchar(filename)) #56 is lenth of path
+      print(paste("processing file ", currFile , "  lines ", 
                   lnums[1], " - ", tail(lnums,1),toc))
       
       Toks <- sample_and_toks(filename, lnums)
@@ -237,11 +236,14 @@ ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
 
 ```
 
+TODO: make Id primary key and unique 
+      or
+      make both index words_Id and words_word
 
 ```{r} 
 #this creates table of all unique words and their IDs + table of 1-grams 
 
-FreqNgr <- ngrams(path, sampSize = 1e5, ngrO = 1, env = "run")
+FreqNgr <- ngrams(data.dir, sampSize = 1e5, ngrO = 1, env = "run")
 
 gr1 <- FreqNgr[[1]]
 gr1 <- gr1[order(gr1$freq, decreasing = T),]
@@ -254,7 +256,9 @@ sqldf("attach 'ngrams' as new")
 sqldf("create table words as select Id, word from gr1 ", dbname = "ngrams")
 sqldf("create table gram1 as select Id as word1, freq from gr1 ", dbname = "ngrams")
 
-sqldf("CREATE INDEX `Words_index` ON `words` (`word` ASC)", dbname = "ngrams")
+sqldf("CREATE UNIQUE INDEX `Words_word_index` ON `words` (`word` ASC)", dbname = "ngrams")
+sqldf("CREATE UNIQUE INDEX `Words_Id_index` ON `words` (`Id` ASC)", dbname = "ngrams")
+
 sqldf("CREATE INDEX `gram1_index` ON `gram1` (`word1` ASC)", dbname = "ngrams")
   
 sqldf("CREATE VIEW `select some 1-gram` AS select * from gram1  join words on (Id = word1)
@@ -269,18 +273,14 @@ So the options to improve performance are:
 1) at every sample drop all the n-grams which have frequency 1.  but some ngrams with whole corpus frequency higher than one will be dropped just because they appear only once in some single  samples.
 2) somehow merge all the samples data in memory and then drop ngrams with frequency 1
 3) store the big ngrams tables in SQL database and update it one by one as new samples are processed. 
-4) store only unique words (1-grams) and for all other grams - tables with indices of words. maybe scan all the files for unique words first so I will have indices for all the words in data and then construct all n>1grams based on it. 
+4) store only unique words (1-grams basically) and for all other grams - tables with indices of words. 
+  -Scan all the files for unique words first so I will have indices for all the words in data 
+  -Construct all n>1grams based on it. 
+  -To merge data from separate samples I use SQL's SUM() function with group by aggreagate.
 
-
-
-```{r}
-time <- results[[1]]
-ngrs <- results[[2]]
-c <- cbind(time,ngrs)
-plot(c, type = 'l')
-```
 
 ## Testing environment
+test everything runs smoothly before investing in long process of running all the data  
 ```{r}
 # tmp <- ngrams(path, sampSize = 1e4, ngrO = 2, env = "test")
 # grA <- tmp[[1]]
@@ -288,11 +288,13 @@ plot(c, type = 'l')
 # tmp <- ngrams(path, sampSize = 1e4, ngrO = 2, env = "test")
 # grB <- tmp[[1]]
 
-result <- ngrams(path, sampSize = 1e4, ngrO = 2, env = "test")
+source('Week2/debug.R')
+
+result1 <- ngrams(data.dir, sampSize = 1e4, ngrO = 2, env = "test")
 
 # "select count(word1) from gram2"
 
-ngrams(path, sampSize = 1e4, ngrO = 2, env = "test")
+result2 <- ngrams(data.dir, sampSize = 1e4, ngrO = 2, env = "test")
 
 sqldf("select w1.word as wd1, w2.word as wd2, gram2.freq
                from gram2 join words w1 on (w1.id == gram2.word1)
@@ -302,13 +304,58 @@ sqldf("select w1.word as wd1, w2.word as wd2, gram2.freq
 ```
 
 ##Running environment
+Actually Creating all the 2 to 5 grams. Careful! takes several hours to run and enslaves your PC.
+So it's set to eval= False so that you dont run it accidentally when knitting
+To run, set eval=True
 
-```{r}
-results <- ngrams(path, sampSize = 5e4, ngrO = 2, env = "run")
-# tmp <- 
-# FreqNgr5 <- tmp[[1]]
+```{r eval=FALSE, include=FALSE}
+
+results <- ngrams(data.dir, sampSize = 1e5, ngrO = 2, env = "run")
+save(results, file = "3grams.perf.graph.rdata")
+
+results <- ngrams(data.dir, sampSize = 1e5, ngrO = 3, env = "run")
+save(results, file = "3grams.perf.graph.rdata")
+
+results <- ngrams(data.dir, sampSize = 1e5, ngrO = 4, env = "run")
+save(results, file = "4grams.perf.graph.rdata")
+
+results <- ngrams(data.dir, sampSize = 1e5, ngrO = 5, env = "run")
+save(results, file = "5grams.perf.graph.rdata")
 
 ```
+
+## plot performance metrics
+```{r}
+time <- results[[1]]
+ngrs <- results[[2]]
+c <- cbind(time,ngrs)
+plot(c, type = 'l')
+```
+
+
+## deflating database
+removing all records where freq = 1 and decreasing database's file size on disk
+```{r}
+tables <- paste("gram", 3:5, sep = "") # I'll leave 1 and 2 grams with freq = 1 
+deleteQrs <- paste("delete from", tables, "where freq = 1")
+
+sqldf(deleteQrs, dbname = "ngrams")
+
+sqldf("vacuum", dbname = "ngrams")
+
+```
+
+##Create indices
+```{r}
+i <- 2:5
+
+idxQrs <- paste("CREATE INDEX `gram5_",i, "index` ON `gram5` (`word",i,"` ASC)" , sep = "")
+idxQrs[1]
+sqldf(idxQrs, dbname = "ngrams")
+
+```
+
+
 
 
 

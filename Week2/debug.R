@@ -3,9 +3,9 @@ l <- determine_nlines('profanity_words.txt') #read profanity vocabulary and conv
 profane <-char_tolower(get_lines('profanity_words.txt', 1:l))
 profane <- profane[!is.na(profane)]
 
-load(file = 'filesInfo.rData') #load information about files: specifically number of lines 
+load(paste(data.dir,'filesInfo.rData',sep = "/")) #load metadata about files: specifically number of lines is what I need
 
-sample_and_toks <- function(filename ,line_numbers)
+sample_text <- function(filename ,line_numbers)
 {
   
   if (is.na(get_lines(filename,1:2)[1])) # check that I can read from file
@@ -15,24 +15,25 @@ sample_and_toks <- function(filename ,line_numbers)
   }
   
   Lines <- get_lines(filename, line_numbers) #sample some lines from a file
-  Encoding(Lines) <- "latin1"  #remove non-ascii chars 
-  Lines <- iconv(Lines, "latin1", "ASCII", sub="")
-  Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
-  Corp <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
-  
-  Toks<- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
-                remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
-  rm(Lines,Corp)
-  Toks <- tokens_remove(Toks, c(stopwords("english"), profane, "rt"))# also remove ReTweet tag
-  
-  return(Toks) #(cS)# 
+
+  return(Lines) #(cS)# 
 }  
 
-ngramize <-function (n, Toks, FreqBig)
+ngramize <-function (n, Lines)
 {
   library(quanteda)
   library(data.table)
   library(dplyr)
+  
+  Encoding(Lines) <- "latin1"  #remove non-ascii chars 
+  Lines <- iconv(Lines, "latin1", "ASCII", sub="")
+  Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
+  Corp <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
+  Toks<- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
+                remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
+  rm(Lines,Corp)
+  
+  Toks <- tokens_remove(Toks, c(stopwords("english"), profane, "rt"))# also remove ReTweet tag
   ngrams <- tokens_ngrams(Toks, n)
   DfmNgr <- dfm(ngrams, tolower = F)
   cS<-sort(colSums(DfmNgr), decreasing = T)
@@ -68,25 +69,26 @@ ngramize <-function (n, Toks, FreqBig)
   return(FreqThis)
 }
 
-
 DBinsert <- function(FreqNgr, tables)
 {
-  ques <- c(paste("insert into ", tables$big ,"  select * from FreqNgr", sep = " "),
-            paste("insert into ", tables$small ," (word1,word2, freq) 
-                  select  word1,word2, sum(freq) as freq
-                  from ", tables$big ,"
-                  group by word1,word2", sep = " "),
-            paste("delete from ", tables$big),
+  cols <- names(FreqNgr)
+  cols <- cols[cols %like% "^word"]
+  cols <- paste(cols, collapse = ", ")
+  
+  ques <- c(paste("insert into", tables$big ,"select * from FreqNgr"),
+            paste("insert into", tables$small ,"(",cols,", freq) ",
+                  "select",cols,", sum(freq) as freq",
+                  "from", tables$big ,
+                  "group by",cols),
+            paste("delete from", tables$big),
             paste("select count(word1) from ", tables$small)
             )
   suppressWarnings(cnt<- sqldf(ques, dbname = "ngrams")[[1]])
   obs <<- c(obs,cnt)
-  print(paste(cnt," 2grams"))
+  print(paste("Iserted ", cnt, "Ngrams into" ,tables$small))
   return(swap(tables))
   
 }
-
-
 
 swap <- function(table)
 {
@@ -104,15 +106,6 @@ slices <- function(files,sampSize)
   return(floor(files$lines / sampSize)) #upper boundary for processing loop
 }
 
-#prof = NULL
-#prof <- profvis({
-
-#User Parameters:
-path <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
-#currFile <- 'en_US.blogs.txt'
-sampSize = 5e4  #1e4 # how much lines to sample in a chunk
-ngrO = 1 #:5 # what Orders of ngrams you require
-
 ngrams <- function(path, sampSize = 5e3, ngrO = 1, env = "test" )
 {
   tic <- Sys.time()
@@ -123,21 +116,39 @@ ngrams <- function(path, sampSize = 5e3, ngrO = 1, env = "test" )
   # a <- list(data.table(word = numeric(1:3), freq = numeric(), stringsAsFactors = F, key = "word"))
   # FreqNgr <- rep(a, length(ngrO))
   
-  wordCols <- paste("word", 1:ngrO, sep = '')
+ 
   # a <- data.table(freq = numeric()) 
   # a[,(wordCols) := numeric(ngrO), by=freq]
   # FreqNgr <- list(a) # for compatibility I'll leave it as list of data.tables, but only one d.t will be there
   # names(FreqNgr) <- paste("gr",ngrO,sep = '') #stamp a names such as 'gr2', 'gr3' etc to each data.table in a list 
   # FreqNgr <- a
   
+  # Total number of slices to process, depending on sample size
+  totslices <- sum(slices(files, sampSize)) 
+    
+  # vector of colunms names, ex. word1, word2, etc
+  wordCols <- paste("word", 1:ngrO, sep = '') 
   
-  totslices <- sum(slices(files, sampSize))
+  # name of table currently being created, ex. gram2
+  gramN <- paste("gram", ngrO, sep = "") 
   
-  tables <- if(totslices%%2==0){list(big = "tmp", small = "gram2") } else {list(big = "gram2", small = "tmp")}
+  # a pair of tables names in working: ex. gram4 and tmp, which will be alternately filled with newer data from one to another
+  tables <- if(totslices%%2==0) {list(big = "tmp", small = gramN)} else {list(big = gramN, small = "tmp")}
   
-  suppressWarnings(sqldf(paste("delete from ", tables), dbname = "ngrams"))
+  # substring of the create query that defines columns, e.g. word1 INT, word2 INT, word3 INT, word4 INT
+  colsdef <- paste(paste(wordCols, "INT"),  collapse = ", ")  
   
-  for (currFile in files[-4,]$file)
+  # Creates grmN and temporary table , if not exists,  ex. 
+  # CREATE TABLE IF NOT EXISTS  tmp   ( word1 INT, word2 INT, word3 INT, word4 INT , freq REAL)"  
+  # CREATE TABLE IF NOT EXISTS  gram4 ( word1 INT, word2 INT, word3 INT, word4 INT , freq REAL)"
+  # And clears them in case they already existed and had some data in them
+  
+  setupQrs <- c(paste("CREATE TABLE IF NOT EXISTS ", tables, "(", colsdef, ", freq REAL)" ),
+                  paste("delete from ", tables))
+  
+  suppressWarnings(sqldf(setupQrs, dbname = "ngrams"))
+  
+  for (currFile in files[-nrow(files),]$file)
   {
     #Derived parameters
     filename <- paste(path,  currFile, sep = '')
@@ -161,13 +172,12 @@ ngrams <- function(path, sampSize = 5e3, ngrO = 1, env = "test" )
       
       toc <-difftime(Sys.time(), tic, units = "mins")
       toc <- paste("| ", sprintf("%.1f", toc ), " ", attr(toc, "units"), "elapsed")
-      #56 is lenth of path
-      print(paste("processing file ", substr(filename,56,nchar(filename)), "  lines ", 
-                  lnums[1], " - ", tail(lnums,1),toc))
+      #
+      print(paste("processing file ", currFile , " lines ", lnums[1], " - ", tail(lnums,1),toc))
       
-      Toks <- sample_and_toks(filename, lnums) # these two functions should be united
-      FreqNgr <- ngramize(ngrO, Toks, FreqNgr)
-      rm(Toks)
+      Lines <- sample_text(filename, lnums) 
+      FreqNgr <- ngramize(ngrO, Lines)
+      #rm(Toks)
       
       tables <- DBinsert(FreqNgr, tables)
       
@@ -188,11 +198,27 @@ ngrams <- function(path, sampSize = 5e3, ngrO = 1, env = "test" )
     #profvis(prof_input = "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/file4fce8ccb11c.Rprof")
     
   }
+  suppressWarnings(sqldf("drop table tmp",dbname = "ngrams"))
   #save(FreqNgr,obs, file = paste(path, ngrO, "grams." ,env, ".allFiles.rData", sep = ''))
   #return(list(FreqNgr,obs))
+  
+#TODO: create index in the db  
+  
 plot(elapsed[-1], obs, type = 'l')
 return(list(elapsed = unclass(elapsed[-1]), objects =obs))
 }
+
+
+#prof = NULL
+#prof <- profvis({
+
+#User Parameters:
+#path <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
+#currFile <- 'en_US.blogs.txt'
+#sampSize = 5e4  #1e4 # how much lines to sample in a chunk
+#ngrO = 1 #:5 # what Orders of ngrams you require
+
+
 
 # tmp <- ngrams(path, sampSize = 5e2, ngrO = 2, env = "test" )
 # FreqNgr <- tmp[[1]]

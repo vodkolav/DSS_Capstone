@@ -1103,6 +1103,12 @@ range(grC$word1)
 ```
 
 
+```{r}
+a <- "select w1.word as wd1, w2.word as wd2, gram2.freq
+               from gram2 join words w1 on (w1.id == gram2.word1)
+                            join words w2 on (w2.id == gram2.word2) 
+				where wd1 = 'forever' and wd2 = 'young'"
+```
 
 
 
