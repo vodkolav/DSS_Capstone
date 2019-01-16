@@ -12,7 +12,7 @@ output:
 #knitr::opts_chunk$set(include = FALSE)
 #knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/DSS_Capstone/')
 data.dir <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
-
+dbname   <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams"
  library(knitr)
 # library(readtext)
  library(quanteda)
@@ -243,7 +243,7 @@ TODO: make Id primary key and unique
 ```{r} 
 #this creates table of all unique words and their IDs + table of 1-grams 
 
-FreqNgr <- ngrams(data.dir, sampSize = 1e5, ngrO = 1, env = "run")
+FreqNgr <- ngrams(data.dir, sampSize = 1e5, ngrO = 1, mode = "run")
 
 gr1 <- FreqNgr[[1]]
 gr1 <- gr1[order(gr1$freq, decreasing = T),]
@@ -259,7 +259,7 @@ sqldf("create table gram1 as select Id as word1, freq from gr1 ", dbname = "ngra
 sqldf("CREATE UNIQUE INDEX `Words_word_index` ON `words` (`word` ASC)", dbname = "ngrams")
 sqldf("CREATE UNIQUE INDEX `Words_Id_index` ON `words` (`Id` ASC)", dbname = "ngrams")
 
-sqldf("CREATE INDEX `gram1_index` ON `gram1` (`word1` ASC)", dbname = "ngrams")
+sqldf("CREATE UNIQUE INDEX `gram1_w1_index` ON `gram1` (`word1` ASC)", dbname = "ngrams")
   
 sqldf("CREATE VIEW `select some 1-gram` AS select * from gram1  join words on (Id = word1)
       where word == 'disrespect'", dbname = "ngrams")
@@ -290,11 +290,11 @@ test everything runs smoothly before investing in long process of running all th
 
 source('Week2/debug.R')
 
-result1 <- ngrams(data.dir, sampSize = 1e4, ngrO = 2, env = "test")
+result1 <- ngrams(data.dir, sampSize = 1e4, ngrO = 2, mode = "test")
 
 # "select count(word1) from gram2"
 
-result2 <- ngrams(data.dir, sampSize = 1e4, ngrO = 2, env = "test")
+result2 <- ngrams(data.dir, sampSize = 1e4, ngrO = 2, mode = "test")
 
 sqldf("select w1.word as wd1, w2.word as wd2, gram2.freq
                from gram2 join words w1 on (w1.id == gram2.word1)
@@ -304,22 +304,23 @@ sqldf("select w1.word as wd1, w2.word as wd2, gram2.freq
 ```
 
 ##Running environment
-Actually Creating all the 2 to 5 grams. Careful! takes several hours to run and enslaves your PC.
-So it's set to eval= False so that you dont run it accidentally when knitting
+Actually Creating all the 2 to 5 grams. 
+Careful! takes several hours to run and enslaves your PC.
+It's set to eval=False so that you dont run it accidentally when knitting
 To run, set eval=True
 
 ```{r eval=FALSE, include=FALSE}
 
-results <- ngrams(data.dir, sampSize = 1e5, ngrO = 2, env = "run")
+results <- ngrams(data.dir, sampSize = 1e5, ngrO = 2, mode = "run")
 save(results, file = "3grams.perf.graph.rdata")
 
-results <- ngrams(data.dir, sampSize = 1e5, ngrO = 3, env = "run")
+results <- ngrams(data.dir, sampSize = 1e5, ngrO = 3, mode = "run")
 save(results, file = "3grams.perf.graph.rdata")
 
-results <- ngrams(data.dir, sampSize = 1e5, ngrO = 4, env = "run")
+results <- ngrams(data.dir, sampSize = 1e5, ngrO = 4, mode = "run")
 save(results, file = "4grams.perf.graph.rdata")
 
-results <- ngrams(data.dir, sampSize = 1e5, ngrO = 5, env = "run")
+results <- ngrams(data.dir, sampSize = 1e5, ngrO = 5, mode = "run")
 save(results, file = "5grams.perf.graph.rdata")
 
 ```
@@ -345,21 +346,25 @@ sqldf("vacuum", dbname = "ngrams")
 
 ```
 
-##Create indices
+##Create indices (dont forget for all the tables)
 ```{r}
-i <- 2:5
+ngrO<-5
+i <- 1:ngrO
+#example:  c("CREATE INDEX `gram5_1to5index` ON `gram5` (`word1` DESC,`word2` DESC,`word3` DESC,`word4` DESC,`word5` DESC)")
 
-idxQrs <- paste("CREATE INDEX `gram5_",i, "index` ON `gram5` (`word",i,"` ASC)" , sep = "")
-idxQrs[1]
-sqldf(idxQrs, dbname = "ngrams")
+pwords <- function(i){paste("`word",1:i,"` ASC", sep = "",collapse=", ")}
+
+idxQrs <- paste("CREATE UNIQUE INDEX `gram",i,"_1to",i, "index` ON `gram",i,"` (",lapply(i, pwords),")" , sep = "")
+
+writeLines(paste(idxQrs, collapse = ";\n"))
+
+sqldf(idxQrs, dbname = dbname)
 
 ```
 
 
 
-
-
-
+## The predicting model
 
 
 

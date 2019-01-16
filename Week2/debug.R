@@ -19,12 +19,8 @@ sample_text <- function(filename ,line_numbers)
   return(Lines) #(cS)# 
 }  
 
-ngramize <-function (n, Lines)
+tokenize <- function(Lines)
 {
-  library(quanteda)
-  library(data.table)
-  library(dplyr)
-  
   Encoding(Lines) <- "latin1"  #remove non-ascii chars 
   Lines <- iconv(Lines, "latin1", "ASCII", sub="")
   Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
@@ -33,7 +29,15 @@ ngramize <-function (n, Lines)
                 remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
   rm(Lines,Corp)
   
-  Toks <- tokens_remove(Toks, c(stopwords("english"), profane, "rt"))# also remove ReTweet tag
+  return(tokens_remove(Toks, c(stopwords("english"), profane, "rt")))# also remove ReTweet tag
+}
+
+ngramize <-function (n, Toks)
+{
+  library(quanteda)
+  library(data.table)
+  library(dplyr)
+  
   ngrams <- tokens_ngrams(Toks, n)
   DfmNgr <- dfm(ngrams, tolower = F)
   cS<-sort(colSums(DfmNgr), decreasing = T)
@@ -106,7 +110,7 @@ slices <- function(files,sampSize)
   return(floor(files$lines / sampSize)) #upper boundary for processing loop
 }
 
-ngrams <- function(path, sampSize = 5e3, ngrO = 1, env = "test" )
+ngrams <- function(path, sampSize = 5e3, ngrO = 1, mode = "test" )
 {
   tic <- Sys.time()
   obs <<- numeric()
@@ -176,8 +180,9 @@ ngrams <- function(path, sampSize = 5e3, ngrO = 1, env = "test" )
       print(paste("processing file ", currFile , " lines ", lnums[1], " - ", tail(lnums,1),toc))
       
       Lines <- sample_text(filename, lnums) 
-      FreqNgr <- ngramize(ngrO, Lines)
-      #rm(Toks)
+      Toks <- tokenize(Lines)
+      FreqNgr <- ngramize(ngrO, Toks)
+      rm(Toks,Lines)
       
       tables <- DBinsert(FreqNgr, tables)
       

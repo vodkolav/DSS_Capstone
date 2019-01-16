@@ -1104,11 +1104,123 @@ range(grC$word1)
 
 
 ```{r}
-a <- "select w1.word as wd1, w2.word as wd2, gram2.freq
-               from gram2 join words w1 on (w1.id == gram2.word1)
+a <- c("select w1.word as wd1, w2.word as wd2, gram2.freq
+from gram2 join words w1 on (w1.id == gram2.word1)
                             join words w2 on (w2.id == gram2.word2) 
-				where wd1 = 'forever' and wd2 = 'young'"
+				where wd1 = 'forever' and wd2 = 'young'")
+dbname<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams_big"
+sqldf(a,dbname = dbname)
 ```
+
+
+
+# Constructing the prediction model
+
+```{r}
+source('predict.R')
+#test constructQuery and predict.word functions
+qtest5 <- constructQuery( search = c('said', 'first', 'quarter' ,'profit'),ngrO = 6)
+writeLines(qtest5)
+print(strrep("=",100))
+
+qtest5m <- constructQuery( search = c('said', 'first', 'quarter' ,'profit'),ngrO = 5)
+writeLines(qtest5m)
+print(strrep("=",100))
+
+qtest4 <- constructQuery( search = c('said','first', 'quarter' ,'profit'),ngrO = 4)
+writeLines(qtest4)
+print(strrep("=",100))
+
+qtest4m <- constructQuery( search = c('first', 'quarter' ,'profit'),ngrO = 4)
+writeLines(qtest4m)
+print(strrep("=",100))
+
+qtest3 <- constructQuery(search = c('quarter' ,'profit'),ngrO = 3)
+writeLines(qtest3)
+
+
+dbname <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams"
+x <- "said first quarter profit"
+predict.word(x)
+predict.word("said")
+
+```
+
+# So the algorithm works as follows:
+given: we have a string of 4 user input words: 'said', 'first', 'quarter' ,'profit'
+1)search 5grams for which  those are 4 first words. Found:
+
+  A)"said"	"first"	"quarter"	"profit"	"fell"  	"2.0"
+  B)"said"	"first"	"quarter"	"profit"	"rose"  	"3.0"
+  C)"said"	"first"	"quarter"	"profit"	"doubled"	"2.0"
+
+2)search 4grams with exactly these words. Found:
+
+  D)"said"	"first"	"quarter"	"profit"	          "14.0"
+
+3)calculate alpha*(A,B,C)/D so that 
+  P("fell"   |D) = 0.14
+  P("rose"   |D) = 0.21
+  P("doubled"|D) = 0.14
+
+Move on to 4-grams. We have a string of 3 user input words: 'first', 'quarter' ,'profit'
+4)search 4grams for which  those are 3 first words. Found:
+
+  E)"first"	"quarter"	"profit"	"thanks"	    "2.0"
+  F)"first"	"quarter"	"profit"	"million"	    "5.0"
+  G)"first"	"quarter"	"profit"	"company"	    "2.0"
+  H)"first"	"quarter"	"profit"	"large"	      "2.0"
+  I)"first"	"quarter"	"profit"	"department"	"2.0"
+  J)"first"	"quarter"	"profit"	"billion"	    "4.0"
+  K)"first"	"quarter"	"profit"	"missed"	    "2.0"
+  L)"first"	"quarter"	"profit"	"fell"	      "10.0"
+  M)"first"	"quarter"	"profit"	"rose"	      "9.0"
+  N)"first"	"quarter"	"profit"	"dropped"	    "3.0"
+  O)"first"	"quarter"	"profit"	"compared"	  "2.0"
+  P)"first"	"quarter"	"profit"	"jumped"	    "7.0"
+  Q)"first"	"quarter"	"profit"	"gained"	    "2.0"
+  R)"first"	"quarter"	"profit"	"doubled"	    "9.0"
+  S)"first"	"quarter"	"profit"	"excluding"	  "2.0"
+  T)"first"	"quarter"	"profit"	"soared"	    "4.0"
+
+
+2)search 3grams with exactly these words. Found:
+
+  U)"first"	"quarter"	"profit"	              "106.0"
+
+
+3)calculate alpha*alpha*(E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T)/U so that 
+  P("fell"   |D) = 0.14
+  P("rose"   |D) = 0.21
+  P("doubled"|D) = 0.14
+
+
+```{r}
+#searchTerm <-x
+  x <- tolower(searchTerm)
+  x <- corpus(x)
+  x <- tokens(x, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
+              remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
+  x <-x[[1]]
+  y = c("said", "rt", "quarter", "are")
+  wat <- paste( "'", y, "'", sep="", collapse =",")
+  ans <- sqldf(paste("select word from words where word in (",wat,")"),dbname = dbname )
+  aa <- ans$word
+  y[y %in% aa]
+  
+  vocabCheck(y)
+
+```
+
+
+
+
+
+
+
+
+
+
 
 
 
