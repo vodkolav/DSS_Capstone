@@ -11,27 +11,37 @@ output:
 ```{r setup, include=FALSE}
 #knitr::opts_chunk$set(include = FALSE)
 #knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/DSS_Capstone/')
-data.dir <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
-dbname   <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams"
- library(knitr)
-# library(readtext)
- library(quanteda)
+data.dir <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US"
+
+dbname <- paste(data.dir,"ngrams", sep = "/")
+print(paste("ngrams database file: ",dbname))
+
+library(knitr)
+library(quanteda)
+library(ggplot2)
+library(LaF)
+library(plyr)
+library(dplyr)
+library(tidyr) 
+library(data.table)
+library(RColorBrewer)
+library(snow)
+library(sqldf)
+library(plotly)
+
+vu <- function(x){View(x)} #because reasons
+
+source('train.R')
+
+#library(profvis)
+
 # library(SnowballC)
- library(ggplot2)
- library(LaF)
- library(plyr)
- library(dplyr)
- library(tidyr)
-# library(plotly)
- library(data.table)
 # library(stringi)
 # library(hunspell)
 # library(gridExtra)
 # library(viridis)
- library(RColorBrewer)
-library(snow)
-library(profvis)
-library(sqldf)
+# library(readtext)
+
 ```
 
     
@@ -73,166 +83,63 @@ kable(files, row.names = F,format.args = list(decimal.mark = ".", big.mark = ","
 
 ## First pass on the data
 Only create index of all unique words to get Ids for the ngrams words.
-This bit of code is highly diplicate, SO I need to unite it with same function for n>1 grams to shrink it.
+
 ```{r all_processing_functions}
 
-profane <- paste(data.dir,'profanity_words.txt', sep = "")
-l <- determine_nlines(profane) #read profanity vocabulary and convert to lower
-profane <-char_tolower(get_lines(profane, 1:l))
-profane <<- profane[!is.na(profane)]
-
-
-load(file = paste(data.dir,'filesInfo.rData', sep = "")) #load information about files: specifically number of lines 
-
-#User Parameters:
-
-#currFile <- 'en_US.blogs.txt'
-# sampSize = 5e4  #1e4 # how much lines to sample in a chunk
-# ngrO = 1 #:5 # what Orders of ngrams you require
-
-
-
-
-sample_and_toks <- function(filepath ,line_numbers)
-{
-  
-  if (is.na(get_lines(filepath,1:2)[1])) # check that I can read from file
-  {
-    print(paste("can't read from file", filepath))
-    stop()
-  }
-  
-  Lines <- get_lines(filepath, line_numbers) #sample some lines from a file
-  Encoding(Lines) <- "latin1"  #remove non-ascii chars 
-  Lines <- iconv(Lines, "latin1", "ASCII", sub="")
-  Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
-  Corp <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
-  
-  Toks<- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
-                remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
-  rm(Lines,Corp)
-  Toks <- tokens_remove(Toks, c(stopwords("english"), profane, "rt"))# also remove ReTweet tag
-  
-  return(Toks) #(cS)# 
-}  
-
-ngramize <-function (n, Toks, FreqBig)
-{
-  library(quanteda)
-  library(data.table)
-  library(dplyr)
-  ngrams <- tokens_ngrams(Toks, n)
-  DfmNgr <- dfm(ngrams, tolower = F)
-  cS<-sort(colSums(DfmNgr), decreasing = T)
-  FreqThis <- data.table(word = names(cS), freq = cS , stringsAsFactors = F, key = "word")
-  #FreqThis <- FreqNgr1$gr2
-  
+mergeVocabs <-function (FreqBig, FreqThis)
+{  
   #wordCols <- paste("word", 1:n, sep = '')
   wordCols <-"word"
   
-  # FreqThis <- FreqThis %>% separate(col=word, sep = "_", into = wordCols ,remove =T)
- 
-  #find ids of each first word in parent table 
-  # word1 <- sqldf("select Id, word from words, FreqThis where (words.word == FreqThis.word1)", dbname = "ngrams")
-  # FreqThis$word1 <- word1$Id
-  # 
-  # word2 <- sqldf("select Id, word from words, FreqThis where (words.word == FreqThis.word2)", dbname = "ngrams")
-  # FreqThis$word2 <- word2$Id
-  
-  # for (i in 1:n)
-  # {
-  #   wordi <- sqldf(paste("select Id, word from words, FreqThis where (words.word == FreqThis.word",i, ")", 
-  #                        sep = ""), dbname ="ngrams")
-  #   FreqThis[,(wordCols[i]) := wordi$Id]
-  # }
-  #FreqBig<-merge(FreqBig[[paste("gr",n,sep = '')]],FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
   FreqBig<-merge(FreqBig,FreqThis, by.x = wordCols, by.y = wordCols, all =T, sort = T)
   FreqBig[is.na(FreqBig)] <-0 #probably should do it with only numeric columns for speed
   FreqBig <- mutate(FreqBig, freq = freq.x + freq.y)
-  
+  cnt <- nrow(FreqBig)
+  obs <<- c(obs, cnt) # save number of unique ngrams for the performance report
+  print(paste(cnt, " Unique words in vocabulary" ))
   return(select(FreqBig, -c("freq.x", "freq.y")))
 }
 
 
-
-
-
-#prof = NULL
-#prof <- profvis({
-
-
-ngrams <- function(path, sampSize = 5e4, ngrO = 1, env = "test" )
+buildVocabulary <- function(path, sampSize = 5e4, ngrO = 1, mode = "test" )
 {
+  if (mode=="test"){print("running in testing mode...")}
   tic <- Sys.time()
-  obs <- numeric()
+  obs <<- numeric()
   elapsed <- Sys.time()
+  sampSize <- ifelse(mode=="test", 1e2, sampSize )
   
-  #A list of data.tables each of which holds ngrams of its order
-  a <- list(data.table(word = numeric(), freq = numeric(), stringsAsFactors = F, key = "word"))
-  FreqNgr <- rep(a, length(ngrO))
+  FreqNgr<- list(data.table(word = numeric(), freq = numeric(), stringsAsFactors = F, key = "word"))
   
-  # wordCols <- paste("word", 1:ngrO, sep = '')
-  # a <- data.table(freq = numeric()) 
-  # a[,(wordCols) := numeric(ngrO), by=freq]
-  # # FreqNgr <- list(a) # for compatibility I'll leave it as list of data.tables, but only one d.t will be there
-  # # names(FreqNgr) <- paste("gr",ngrO,sep = '') #stamp a names such as 'gr2', 'gr3' etc to each data.table in a list 
-  # FreqNgr <- a
-  
-  
-  for (currFile in files[-4,]$file)
+  for (currFile in files[-nrow(files),]$file)
   {
     #Derived parameters
     filename <- paste(path,  currFile, sep = '')
-    
-    sampSize <- ifelse(env=="test", 1e2, sampSize )
-    nslices = floor(files[currFile,]$lines / sampSize) #upper boundary for processing loop
-    #rng = (nslices-1):nslices # 10 # for quick tests 
-    #rng = 0:nslices # 10 # for full file run. must start at zero
-    
+    nslices <- slices(files[currFile,], sampSize) #upper boundary for processing loop
     rndslices <- ceiling(runif(1,0,nslices)) # smaple random place in data for testing
-    rng <- if(env=="test") (rndslices-1):rndslices else 0:nslices 
-    
-    
-    #cl <- makeSOCKcluster(rep("localhost", length(ngO)))
+    rng <- if(mode=="test") (rndslices-2):rndslices else 0:nslices 
     
     for (i  in rng) # 900)#
     {
       lnums <- (i*sampSize+1):((i+1)*sampSize)
-      
       toc <-difftime(Sys.time(), tic, units = "mins")
       toc <- paste("| ", sprintf("%.1f", toc ), " ", attr(toc, "units"), "elapsed")
-      # substr(filename,56,nchar(filename)) #56 is lenth of path
-      print(paste("processing file ", currFile , "  lines ", 
-                  lnums[1], " - ", tail(lnums,1),toc))
+      print(paste("processing file ", currFile , " lines ", lnums[1], " - ", tail(lnums,1),toc))
       
-      Toks <- sample_and_toks(filename, lnums)
-      FreqNgr <- ngramize(ngrO, Toks, FreqNgr)
+      # The actual processig steps
+      Lines   <- sample_text(filename, lnums) 
+      Toks    <- tokenize(Lines, ngrO)
+      FreqThis <- Freqs(Toks)
+      rm(Toks,Lines)
+      FreqNgr <- mergeVocabs(FreqNgr, FreqThis)
       
-      #FreqNgr <- parLapply(cl, ngO, ngramize, Toks, FreqNgr)
-      
-      ob <-dim(FreqNgr)[1]
-      obs <- c(obs, ob)
-      print(paste(ob, "unique tokens| ", object.size(FreqNgr), " bytes"))
       elapsed <- c(elapsed, difftime(Sys.time(), tic, units = "mins"))
     }
-    #stopCluster(cl)
-    #}, prof_output = ".")
-    
-    
-    #Freq1grBlogs <- FreqNgr
-    #
-    #FreqNgr["gr2"]
-    #profvis(prof_input = "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/file4fce8ccb11c.Rprof")
-    
   }
-  save(FreqNgr,obs, file = paste(path, ngrO, "grams." ,env, ".allFiles.rData", sep = ''))
-  return(list(FreqNgr,obs))
+  #save(FreqNgr,obs, file = paste(path, ngrO, "grams." ,mode, ".allFiles.rData", sep = ''))
+  return(list(FreqNgr = FreqNgr,perf = data.frame(elapsed = unclass(elapsed), objects =obs, ngrO = rep(ngrO, length(obs)))))
 }
 
-# tmp <- ngrams(path, sampSize = 5e2, ngrO = 2, env = "test" )
-# FreqNgr <- tmp[[1]]
-# obs <- tmp[[2]]
-# plot(obs, type = 'l')
 
 ```
 
@@ -240,31 +147,40 @@ TODO: make Id primary key and unique
       or
       make both index words_Id and words_word
 
+```{r}
+result <- buildVocabulary(data.dir, sampSize = 1e2, ngrO = 1, mode = "test")
+```
+
+
 ```{r} 
-#this creates table of all unique words and their IDs + table of 1-grams 
+#this creates table of all unique words (vocabulary) and their IDs + table of 1-grams 
 
-FreqNgr <- ngrams(data.dir, sampSize = 1e5, ngrO = 1, mode = "run")
+result <- buildVocabulary(data.dir, sampSize = 1e5, ngrO = 1, mode = "run")
 
-gr1 <- FreqNgr[[1]]
+results01 <- result$perf
+save(results0, file = paste(data.dir,"perf", '0grams.graph.rdata',sep = "/"))
+
+
+gr1 <- result[[1]]
 gr1 <- gr1[order(gr1$freq, decreasing = T),]
 gr1$Id <- 1:dim(gr1)[1]
 
-sqldf("attach 'ngrams' as new") 
+sqldf(paste("attach '" ,dbname,"' as new", sep = ""))
 
 #names(gr1)[1]<- "word"
 
-sqldf("create table words as select Id, word from gr1 ", dbname = "ngrams")
-sqldf("create table gram1 as select Id as word1, freq from gr1 ", dbname = "ngrams")
+sqldf("create table words as select Id, word from gr1 ", dbname = dbname)
+sqldf("create table gram1 as select Id as word1, freq from gr1 ", dbname = dbname)
 
-sqldf("CREATE UNIQUE INDEX `Words_word_index` ON `words` (`word` ASC)", dbname = "ngrams")
-sqldf("CREATE UNIQUE INDEX `Words_Id_index` ON `words` (`Id` ASC)", dbname = "ngrams")
+sqldf("CREATE UNIQUE INDEX `Words_word_index` ON `words` (`word` ASC)", dbname = dbname)
+sqldf("CREATE UNIQUE INDEX `Words_Id_index` ON `words` (`Id` ASC)", dbname = dbname)
 
-sqldf("CREATE UNIQUE INDEX `gram1_w1_index` ON `gram1` (`word1` ASC)", dbname = "ngrams")
+sqldf("CREATE UNIQUE INDEX `gram1_w1_index` ON `gram1` (`word1` ASC)", dbname = dbname)
   
 sqldf("CREATE VIEW `select some 1-gram` AS select * from gram1  join words on (Id = word1)
-      where word == 'disrespect'", dbname = "ngrams")
+      where word == 'disrespect'", dbname = dbname)
 sqldf("CREATE VIEW `top 50 1grams` AS select  * from gram1  join words on (Id = word1) 
-      limit 50", dbname = "ngrams")
+      limit 50", dbname = dbname)
 ```
 
 
@@ -282,24 +198,14 @@ So the options to improve performance are:
 ## Testing environment
 test everything runs smoothly before investing in long process of running all the data  
 ```{r}
-# tmp <- ngrams(path, sampSize = 1e4, ngrO = 2, env = "test")
-# grA <- tmp[[1]]
-# 
-# tmp <- ngrams(path, sampSize = 1e4, ngrO = 2, env = "test")
-# grB <- tmp[[1]]
 
-source('Week2/debug.R')
+results2 <- train.word(data.dir, sampSize = 1e2, ngrO = 2, mode = "test")
 
-result1 <- ngrams(data.dir, sampSize = 1e4, ngrO = 2, mode = "test")
+results3 <- train.word(data.dir, sampSize = 1e2, ngrO = 3, mode = "test")
 
-# "select count(word1) from gram2"
+results4 <- train.word(data.dir, sampSize = 1e2, ngrO = 4, mode = "test")
 
-result2 <- ngrams(data.dir, sampSize = 1e4, ngrO = 2, mode = "test")
-
-sqldf("select w1.word as wd1, w2.word as wd2, gram2.freq
-               from gram2 join words w1 on (w1.id == gram2.word1)
-                            join words w2 on (w2.id == gram2.word2) 
-				where wd1 = 'years' and wd2 = 'ago'", dbname = "ngrams" )
+results5 <- train.word(data.dir, sampSize = 1e2, ngrO = 5, mode = "test")
 
 ```
 
@@ -311,26 +217,30 @@ To run, set eval=True
 
 ```{r eval=FALSE, include=FALSE}
 
-results <- ngrams(data.dir, sampSize = 1e5, ngrO = 2, mode = "run")
-save(results, file = "3grams.perf.graph.rdata")
+results2 <- train.word(data.dir, sampSize = 1e5, ngrO = 2, mode = "run")
+save(results2, file = paste(data.dir, "perf", "2grams.graph.rdata",sep = "/"))
 
-results <- ngrams(data.dir, sampSize = 1e5, ngrO = 3, mode = "run")
-save(results, file = "3grams.perf.graph.rdata")
+results3 <- train.word(data.dir, sampSize = 1e5, ngrO = 3, mode = "run")
+save(results3, file = paste(data.dir, "perf", "3grams.graph.rdata",sep = "/"))
 
-results <- ngrams(data.dir, sampSize = 1e5, ngrO = 4, mode = "run")
-save(results, file = "4grams.perf.graph.rdata")
+results4 <- train.word(data.dir, sampSize = 1e5, ngrO = 4, mode = "run")
+save(results4, file = paste(data.dir, "perf", "4grams.graph.rdata",sep = "/"))
 
-results <- ngrams(data.dir, sampSize = 1e5, ngrO = 5, mode = "run")
-save(results, file = "5grams.perf.graph.rdata")
+results5 <- train.word(data.dir, sampSize = 1e5, ngrO = 5, mode = "run")
+save(results5, file = paste(data.dir, "perf", "5grams.graph.rdata",sep = "/"))
 
 ```
 
 ## plot performance metrics
 ```{r}
-time <- results[[1]]
-ngrs <- results[[2]]
-c <- cbind(time,ngrs)
-plot(c, type = 'l')
+results <- rbind(results0,results2,results3,results4,results5)
+results$ngrO <- factor(results$ngrO)
+save(results, file = paste(data.dir, "allGrams.perf.graph.rdata",sep = "/"))
+
+g <- ggplot(data = results) + geom_line(aes(x= elapsed, y = objects, color = ngrO))
+g
+#ggplotly(g)
+
 ```
 
 
@@ -340,9 +250,9 @@ removing all records where freq = 1 and decreasing database's file size on disk
 tables <- paste("gram", 3:5, sep = "") # I'll leave 1 and 2 grams with freq = 1 
 deleteQrs <- paste("delete from", tables, "where freq = 1")
 
-sqldf(deleteQrs, dbname = "ngrams")
+sqldf(deleteQrs, dbname = dbname)
 
-sqldf("vacuum", dbname = "ngrams")
+sqldf("vacuum", dbname = dbname)
 
 ```
 

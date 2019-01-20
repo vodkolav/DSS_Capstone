@@ -7,7 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/corpus/en_US/')
+  knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/DSS_Capstone/Week2/')
+data.dir <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
+dbname   <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams"
 library(readtext)
 library(quanteda)
 library(SnowballC)
@@ -19,6 +21,7 @@ library(plotly)
 library(data.table)
 library(hunspell)
 library(sqldf)
+library(stringi)
 ```
 
 
@@ -1118,6 +1121,7 @@ sqldf(a,dbname = dbname)
 
 ```{r}
 source('predict.R')
+list.files()
 #test constructQuery and predict.word functions
 qtest5 <- constructQuery( search = c('said', 'first', 'quarter' ,'profit'),ngrO = 6)
 writeLines(qtest5)
@@ -1141,6 +1145,7 @@ writeLines(qtest3)
 
 dbname <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams"
 x <- "said first quarter profit"
+x <- "Hello, how are you"
 predict.word(x)
 predict.word("said")
 
@@ -1216,10 +1221,18 @@ Move on to 4-grams. We have a string of 3 user input words: 'first', 'quarter' ,
 
 
 
+Not removing stopwords anymore
 
-
-
-
+ -debug.R renamed to train.R
+ -added breaking corpus to single sentences
+ -not removing stopwords anymore
+ -training functions compartmentalized and refactored as much as possible and moved to train.R
+ -buildVocabulary and predict use functions from train
+ -removed a lot of commented code 
+ -dbname is now a parameter
+ -data for performance graph is now gathered 
+ -added managing of some boundary cases of predict
+ -data.dir variable now helps with 'file not found' problem
 
 
 

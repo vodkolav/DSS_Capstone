@@ -23,6 +23,8 @@ constructQuery <- function( search = c('said', 'first', 'quarter' ,'profit'), ng
 
 vocabCheck <- function(y)
 {
+  #Check input against vocabulary and drop all the words that are not in it.
+  #Also, take only 4 last words, since the model is limited to 5-grams.
   wat <- paste( "'", y, "'", sep="", collapse =",")
   ans <- sqldf(paste("select word from words where word in (",wat,")"),dbname = dbname )
   #tryCatch(, error = browser())
@@ -43,10 +45,7 @@ predict.word <-function(x)
   if (stri_length(x)==0){
     return(c('the', 'on', 'a'))
     }
-  x <- tolower(x)
-  x <- corpus(x)
-  x <- tokens(x, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
-              remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
+  x<-tokenize(x)
   x <- gsub('\'', '\'\'', x[[1]], perl=T) 
   searchTerm <-vocabCheck(x)
   if (identical(searchTerm,character(0))){return(c('they', 'are', 'here'))}
@@ -55,8 +54,8 @@ predict.word <-function(x)
 
   
   ngrO <- length(searchTerm)+1
-  alp <-4
-  S <- data.frame(pred = character(),score = integer())
+  alp <-.4
+  S <- data.frame(pred = character(),score = integer(),stringsAsFactors = F)
   for(i in ngrO:2)
   {
     wi <- sqldf(constructQuery(search = searchTerm, i),dbname =dbname)
@@ -74,12 +73,19 @@ predict.word <-function(x)
   
   S<-S[order(S$score,decreasing = T),]
   #})
-  #print(pv)
-  return(S[1:3,"pred"])
+
+  ret <- S[1:3,"pred"]
+    if(any(is.na(ret)))
+  {
+      repl<-c("i","am","fat")
+      ret[is.na(ret)]<-repl[is.na(ret)]
+  }
+  
+  return(ret)
   
 }
 
-dbname <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams"
+
 x <- "said first quarter profit"
 x <- "said first"
 #profvis({predict.word(x)})
