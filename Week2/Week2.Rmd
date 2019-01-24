@@ -1218,22 +1218,90 @@ Move on to 4-grams. We have a string of 3 user input words: 'first', 'quarter' ,
 ```
 
 
+```{r}
+SSS <- sqldf("select pred, max(score) as score from SS group by pred order by score desc")
+plot(SS$score)
+plot(SSS$score)
+
+system.time({sqldf("select word from words order by Id limit 10", dbname = dbname)})
+
+
+```
 
 
 
-Not removing stopwords anymore
+## Predicting the quiz
 
- -debug.R renamed to train.R
- -added breaking corpus to single sentences
- -not removing stopwords anymore
- -training functions compartmentalized and refactored as much as possible and moved to train.R
- -buildVocabulary and predict use functions from train
- -removed a lot of commented code 
- -dbname is now a parameter
- -data for performance graph is now gathered 
- -added managing of some boundary cases of predict
- -data.dir variable now helps with 'file not found' problem
+```{r}
+Quiz <- "The guy in front of me just bought a pound of bacon, a bouquet, and a case of
+You're the reason why I smile everyday. Can you follow me please? It would mean the
+Hey sunshine, can you follow me and make me the
+Very early observations on the Bills game: Offense still struggling but the
+Go on a romantic date at the
+Well I'm pretty sure my granny has some old bagpipes in her garage I'll dust them off and be on my
+Ohhhhh #PointBreak is on tomorrow. Love that film and haven't seen it in quite some
+After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little
+Be grateful for the good times and keep the faith during the
+If this isn't the cutest thing you've ever seen, then you must be"
 
+Ans <- "pretzels
+beer
+cheese
+soda
+best
+world
+universe
+most
+bluest
+happiest
+smelliest
+saddest
+referees
+defense
+crowd
+players
+beach
+movies
+mall
+grocery
+phone
+way
+motorcycle
+horse
+weeks
+years
+thing
+time
+ears
+eyes
+toes
+fingers
+sad
+bad
+hard
+worse
+insane
+callous
+asleep
+insensitive"
+
+Ans <- strsplit(Ans,"\n")[[1]]
+Ans <- matrix(Ans,nrow =4,ncol = 10)
+colnames(Ans) <- 1:10
+
+Quiz <- strsplit(Quiz,"\n")[[1]]
+
+
+pred <- sapply(Quiz, predict.word, 7)
+colnames(pred) <- 1:10
+cm <- numeric(10)
+for (i in 1:10)
+{
+  cm[i]<- sum(pred[,i] %in% Ans[,i])
+}
+
+cm
+```
 
 
 

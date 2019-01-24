@@ -95,6 +95,7 @@ slices <- function(files,sampSize)
 train.word <- function(path, sampSize = 5e3, ngrO = 1, mode = "test" )
 {
   if (mode=="test"){print("running in testing mode...")}
+  print(paste("Database file ", dbname) )
   tic <- Sys.time()
   obs <- numeric()
   elapsed <- numeric()

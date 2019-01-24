@@ -1,5 +1,7 @@
 # Constructinng the prediction model
 
+library(stringi)
+
 constructQuery <- function( search = c('said', 'first', 'quarter' ,'profit'), ngrO = 5)
 {
   
@@ -38,47 +40,53 @@ vocabCheck <- function(y)
   return(tail(y,4))
 }
 
+mostFreqWords <- function(n = 3)
+{
+  sqldf(paste("select word from words order by Id limit" ,n ), dbname = dbname)$word
+}
 
-predict.word <-function(x)
+
+predict.word <-function(x, n = 3)
 {
   
   if (stri_length(x)==0){
-    return(c('the', 'on', 'a'))
+    # return n most common words
+    return(mostFreqWords(n))
     }
   x<-tokenize(x)
   x <- gsub('\'', '\'\'', x[[1]], perl=T) 
   searchTerm <-vocabCheck(x)
-  if (identical(searchTerm,character(0))){return(c('they', 'are', 'here'))}
-  #searchTerm <- c('said', 'first', 'quarter' ,'profit')
-  
-
+  if (identical(searchTerm,character(0))){
+    return(mostFreqWords(n))}
   
   ngrO <- length(searchTerm)+1
   alp <-.4
-  S <- data.frame(pred = character(),score = integer(),stringsAsFactors = F)
+  S <- data.table(pred = character(),score = integer(), ngram = numeric() ,stringsAsFactors = F)
   for(i in ngrO:2)
   {
     wi <- sqldf(constructQuery(search = searchTerm, i),dbname =dbname)
     if(nrow(wi)<1){
       #just move on
-      #return(c('i', 'am', 'fat'))
     }else{
       wi_1 <- sqldf(constructQuery(search = searchTerm, i-1),dbname =dbname)
       num<- paste("wd",i,sep="")
-      s<-data.frame(pred = wi[[num]],score =(alp^(ngrO-i))*  wi$freq/wi_1$freq,stringsAsFactors = F)
+      s<-data.table(pred = wi[[num]],score =(wi$freq/wi_1$freq*alp^(ngrO-i)), ngram = rep(i,nrow(wi)),stringsAsFactors = F)
       S<-rbind(S,s)
     }
     searchTerm <-searchTerm[-1] #tail(searchTerm,i-1)
   }
-  
-  S<-S[order(S$score,decreasing = T),]
-  #})
+  #The same predictions from different ngrams may end up in S. So largest score between them is selected. 
+  #Also, ordered by descending score.
+  #SSS <<- sqldf("select pred, max(score)as score, max(ngram) as ngram  from S group by pred order by score desc")
+  SSS <<- S[order(-score),.(score = max(score)),by=.(pred)]
+  #SSS <<- S[.(scr),.(scr = max(score)),by=.(pred)]
 
-  ret <- S[1:3,"pred"]
+
+  ret <- SSS[1:n,pred]
     if(any(is.na(ret)))
   {
-      repl<-c("i","am","fat")
-      ret[is.na(ret)]<-repl[is.na(ret)]
+      replc<-mostFreqWords(n)
+      ret[is.na(ret)]<-replc[is.na(ret)]
   }
   
   return(ret)
@@ -86,8 +94,8 @@ predict.word <-function(x)
 }
 
 
-x <- "said first quarter profit"
-x <- "said first"
+# x <- "said first quarter profit"
+# x <- "said first"
 #profvis({predict.word(x)})
  
 # predict.word("said")

@@ -11,10 +11,6 @@ output:
 ```{r setup, include=FALSE}
 #knitr::opts_chunk$set(include = FALSE)
 #knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/DSS_Capstone/')
-data.dir <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US"
-
-dbname <- paste(data.dir,"ngrams", sep = "/")
-print(paste("ngrams database file: ",dbname))
 
 library(knitr)
 library(quanteda)
@@ -28,12 +24,20 @@ library(RColorBrewer)
 library(snow)
 library(sqldf)
 library(plotly)
+library(profvis)
 
-vu <- function(x){View(x)} #because reasons
+#because I always mistype V in View
+vu <- function(x){View(x)} 
+
+# useful for concatenating parts of filepath
+`%/%` = function(e1,e2) return(paste(e1,e2, sep = "/"))
+
+data.dir <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US"
+
+dbname <- data.dir %/% "ngrams"
+print(paste("ngrams database file: ",dbname))
 
 source('train.R')
-
-#library(profvis)
 
 # library(SnowballC)
 # library(stringi)
@@ -44,6 +48,12 @@ source('train.R')
 
 ```
 
+Careful!     
+```{r eval=FALSE, include=FALSE}
+if(F){rm(list = ls())}
+```
+    
+    
     
 ```{r summaries, echo=FALSE, cache=T}
 
@@ -174,8 +184,6 @@ sqldf("create table gram1 as select Id as word1, freq from gr1 ", dbname = dbnam
 
 sqldf("CREATE UNIQUE INDEX `Words_word_index` ON `words` (`word` ASC)", dbname = dbname)
 sqldf("CREATE UNIQUE INDEX `Words_Id_index` ON `words` (`Id` ASC)", dbname = dbname)
-
-sqldf("CREATE UNIQUE INDEX `gram1_w1_index` ON `gram1` (`word1` ASC)", dbname = dbname)
   
 sqldf("CREATE VIEW `select some 1-gram` AS select * from gram1  join words on (Id = word1)
       where word == 'disrespect'", dbname = dbname)
@@ -233,12 +241,19 @@ save(results5, file = paste(data.dir, "perf", "5grams.graph.rdata",sep = "/"))
 
 ## plot performance metrics
 ```{r}
-results <- rbind(results0,results2,results3,results4,results5)
+# results0 <-load(data.dir %/% "perf/1grams.perf.graph.rData")
+# results0 <- results0[[1]]
+# vu(results0)
+results <- rbind(results2,results3,results4, results5)
 results$ngrO <- factor(results$ngrO)
 save(results, file = paste(data.dir, "allGrams.perf.graph.rdata",sep = "/"))
 
 g <- ggplot(data = results) + geom_line(aes(x= elapsed, y = objects, color = ngrO))
 g
+
+totaltime <- tail(results2$elapsed,1) +  tail(results3$elapsed,1) + tail(results4$elapsed,1) + tail(results5$elapsed,1) 
+
+g1 <- ggplot(data = )
 #ggplotly(g)
 
 ```
@@ -247,8 +262,8 @@ g
 ## deflating database
 removing all records where freq = 1 and decreasing database's file size on disk
 ```{r}
-tables <- paste("gram", 3:5, sep = "") # I'll leave 1 and 2 grams with freq = 1 
-deleteQrs <- paste("delete from", tables, "where freq = 1")
+ptables <- paste("gram", 2:5, sep = "") # 1 grams with freq = 1 will not be removed
+deleteQrs <- paste("delete from", ptables, "where freq = 1")
 
 sqldf(deleteQrs, dbname = dbname)
 
@@ -272,11 +287,38 @@ sqldf(idxQrs, dbname = dbname)
 
 ```
 
+#Prediction 
+
+## Test some predictions
+```{r}
+source('predict.R')
 
 
-## The predicting model
+x <- "said first quarter profit"
+x <- "Hello, how are you"
+x <- "technical discussions by people that are serious about protecting the us"
+predict.word(x)
+
+profvis({predict.word(x)})
+system.time(y <- predict.word(x))
+y
+
+profvis({t <- tokenize(x)})
+
+```
 
 
+## The predicting model benchmarking
+
+
+```{r}
+test.data.size <-7
+
+debugSource('../dsci-benchmark/benchmark.R')
+
+bench <- benchmark(predict.word, sent.list = list('tweets' = tweets, 'blogs' = blogs), ext.output = F)
+
+```
 
 
 
