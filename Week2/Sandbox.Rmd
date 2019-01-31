@@ -183,6 +183,23 @@ all.equal(
 ```
 
 
+```{r}
+q <- "select
+w4.word as wd4, gram4.freq
+from gram4
+join words w1 on (w1.id == gram4.word1)
+join words w2 on (w2.id == gram4.word2)
+join words w3 on (w3.id == gram4.word3)
+join words w4 on (w4.id == gram4.word4)
+where
+ w2.word = 'the' and w3.word = 'us'
+ order by freq desc
+ limit 100
+"
+wat <-sqldf(q, dbname = dbname)
+wat
+#wat[order(wat$freq, decreasing = T),]
+```
 
 
 

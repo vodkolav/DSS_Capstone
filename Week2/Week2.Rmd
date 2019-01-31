@@ -1110,9 +1110,18 @@ range(grC$word1)
 a <- c("select w1.word as wd1, w2.word as wd2, gram2.freq
 from gram2 join words w1 on (w1.id == gram2.word1)
                             join words w2 on (w2.id == gram2.word2) 
-				where wd1 = 'forever' and wd2 = 'young'")
-dbname<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams_big"
-sqldf(a,dbname = dbname)
+            where wd2 = 'the'
+            order by freq desc
+            limit 100")				
+#where wd1 = 'forever' and wd2 = 'young'")
+dbname<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams"
+gr2 <- sqldf(a,dbname = dbname)
+gr2 <- gr2 %>% unite("word", c("wd1","wd2"))
+
+plt1grm <- ggplot(head(gr2,100), aes(x=reorder(word, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') + xlab("") +
+        coord_flip() + ylab("Number of Appearances") + ggtitle("most frequent 2grams") 
+ggplotly(plt1grm)
 ```
 
 
@@ -1219,9 +1228,9 @@ Move on to 4-grams. We have a string of 3 user input words: 'first', 'quarter' ,
 
 
 ```{r}
-SSS <- sqldf("select pred, max(score) as score from SS group by pred order by score desc")
-plot(SS$score)
-plot(SSS$score)
+
+
+plot(SSS$score, col = )
 
 system.time({sqldf("select word from words order by Id limit 10", dbname = dbname)})
 
@@ -1230,78 +1239,29 @@ system.time({sqldf("select word from words order by Id limit 10", dbname = dbnam
 
 
 
-## Predicting the quiz
-
 ```{r}
-Quiz <- "The guy in front of me just bought a pound of bacon, a bouquet, and a case of
-You're the reason why I smile everyday. Can you follow me please? It would mean the
-Hey sunshine, can you follow me and make me the
-Very early observations on the Bills game: Offense still struggling but the
-Go on a romantic date at the
-Well I'm pretty sure my granny has some old bagpipes in her garage I'll dust them off and be on my
-Ohhhhh #PointBreak is on tomorrow. Love that film and haven't seen it in quite some
-After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little
-Be grateful for the good times and keep the faith during the
-If this isn't the cutest thing you've ever seen, then you must be"
+q <- "select  word, freq from gram1  join words on (Id = word1) 
+      limit 500"
 
-Ans <- "pretzels
-beer
-cheese
-soda
-best
-world
-universe
-most
-bluest
-happiest
-smelliest
-saddest
-referees
-defense
-crowd
-players
-beach
-movies
-mall
-grocery
-phone
-way
-motorcycle
-horse
-weeks
-years
-thing
-time
-ears
-eyes
-toes
-fingers
-sad
-bad
-hard
-worse
-insane
-callous
-asleep
-insensitive"
+gr1 <- sqldf(q, dbname = dbname)
 
-Ans <- strsplit(Ans,"\n")[[1]]
-Ans <- matrix(Ans,nrow =4,ncol = 10)
-colnames(Ans) <- 1:10
-
-Quiz <- strsplit(Quiz,"\n")[[1]]
-
-
-pred <- sapply(Quiz, predict.word, 7)
-colnames(pred) <- 1:10
-cm <- numeric(10)
-for (i in 1:10)
-{
-  cm[i]<- sum(pred[,i] %in% Ans[,i])
-}
-
-cm
+plt1grm <- ggplot(head(gr1,100), aes(x=reorder(word, freq), y=freq)) + 
+        geom_bar(stat="Identity", fill='red') + xlab("") +
+        coord_flip() + ylab("Number of Appearances") + ggtitle("most frequent 1grams") 
+ggplotly(plt1grm)
 ```
+
+
+
+SlothKey App first version  
+ -first basic version of prediction application
+ -tokenize function and profane loading moved to predict.r
+ -ngrams database, profanity and predict.r moved to App directory
+ -benchmarking gives good results. maybe too good
+ -moved quizzes to separate file which is untracked in this repo 
+
+
+
 
 
 

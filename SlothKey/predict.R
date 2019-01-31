@@ -1,6 +1,20 @@
 # Constructinng the prediction model
 
-library(stringi)
+load('profane.rda')
+
+tokenize <- function(Lines, n=1)
+{
+  Encoding(Lines) <- "latin1"  #remove non-ascii chars 
+  Lines <- iconv(Lines, "latin1", "ASCII", sub="")
+  Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
+  Corp  <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
+  Corp  <- corpus_reshape(Corp, to = "sentences") # break corpus to single sentences, so that ngrams wont be created on the border of two sentences
+  Toks  <- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
+                  remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
+  rm(Lines,Corp)              #stopwords("english"),
+  Toks <- tokens_remove(Toks, c( profane, "rt")) # also remove ReTweet tag
+  if(n>1){return(tokens_ngrams(Toks, n))}else{return(Toks)}
+}
 
 constructQuery <- function( search = c('said', 'first', 'quarter' ,'profit'), ngrO = 5, lim = 0)
 {
@@ -103,6 +117,16 @@ predict.word <-function(x, n = 3)
   return(ret)
   
 }
+
+
+predict.dummy <- function(x,n=1){
+  opts <- c("horticultural", "spiritual", "marital", "financial",
+            "decade",  "morning", "month", "weekend",   
+            "stress", "hunger", "happiness", "sleepiness")
+  return(sample(opts,n))
+}
+
+
 
 # x <- "I like how the same people are in almost all of Adam Sandler's" 
 # system.time({ a <- predict.word(x,10)})

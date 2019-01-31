@@ -32,12 +32,26 @@ vu <- function(x){View(x)}
 # useful for concatenating parts of filepath
 `%/%` = function(e1,e2) return(paste(e1,e2, sep = "/"))
 
-data.dir <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US"
+ data.dir <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US"
+ 
+# db which has:1 to 5 grams, stopwords remain , freq=1 filtered out, indices created, 746 MB
+ dbname <- data.dir %/% "ngrams"
 
-dbname <- data.dir %/% "ngrams"
+# db which has:1 to 5 grams, stopwords removed, freq=1 filtered out, indices created, 343 MB
+#dbname <- "/media/michael/SSData/Studies/Data Science Capstone/ngrams (backup_1to5grams_filtered_indices)"
+
+# db which has:1 to 5 grams, stopwords remain, freq=1 remain, indices created, 7.8 GB
+#dbname <- "/media/michael/SSData/Studies/Data Science Capstone/ngrams (all_grams with_stopwords)"
+
+# db which has:1 to 5 grams, stopwords removed, freq=1 remain, indices created, 6 GB
+#dbname <- "/media/michael/SSData/Studies/Data Science Capstone/ngrams (backup_1to5grams_with_freq1)"
+
+
+
 print(paste("ngrams database file: ",dbname))
-
+list.files()
 source('train.R')
+source('../SlothKey/predict.R')
 
 # library(SnowballC)
 # library(stringi)
@@ -291,37 +305,76 @@ sqldf(idxQrs, dbname = dbname)
 
 ## Test some predictions
 ```{r}
-source('predict.R')
+
 
 
 x <- "said first quarter profit"
 x <- "Hello, how are you"
-x <- "technical discussions by people that are serious about protecting the us"
-predict.word(x)
+x <- "technical discussions by people that are serious about protecting the"
+x <- "I like how the same people are in almost all of Adam Sandler's" 
+pred <- predict.word(x, 50)
 
+"us" %in% pred
+
+vu(pred)
+predict.word("")
 profvis({predict.word(x)})
 system.time(y <- predict.word(x))
 y
 
 profvis({t <- tokenize(x)})
 
+
 ```
-
-
-## The predicting model benchmarking
+ The predicting model benchmarking
 
 
 ```{r}
-test.data.size <-7
-
-debugSource('../dsci-benchmark/benchmark.R')
-
-bench <- benchmark(predict.word, sent.list = list('tweets' = tweets, 'blogs' = blogs), ext.output = F)
+#options(warn=1)
+#test.data.size <-7
+#lnums <- 1:7
+lnums <- 347:348
+source("../dsci-benchmark/benchmark.R")
+                                                        ##,'blogs' = blogs
+bench <- benchmark(predict.word, sent.list = li+st('tweets' = tweets), ext.output = F)
 
 ```
 
 
 
+
+
+Very (maybe too) good result
+Overall top-3 score:     26.78 %
+Overall top-1 precision: 24.22 %
+Overall top-3 precision: 28.99 %
+Average runtime:         112.05 msec
+Number of predictions:   10079
+Total memory used:       5.27 MB
+
+Dataset details
+ Dataset "blogs" (1 lines, 20 words, hash a0a8c15f90732b52f7e6eb85d7c15878bdb924a69866718e987cb6e256776cff)
+  Score: 31.58 %, Top-1 precision: 31.58 %, Top-3 precision: 31.58 %
+ Dataset "tweets" (860 lines, 10822 words, hash 38bd3d1edf091d9b58da4701030ca08a464904e731281220ced2bc7514b81a74)
+  Score: 21.98 %, Top-1 precision: 16.86 %, Top-3 precision: 26.39 %
+
+
+
+
+
+test.data.size <-7
+Overall top-3 score:     19.84 %
+Overall top-1 precision: 15.16 %
+Overall top-3 precision: 23.89 %
+Average runtime:         96.28 msec
+Number of predictions:   323
+Total memory used:       2.20 MB
+
+Dataset details
+ Dataset "blogs" (7 lines, 219 words, hash 7826fbcd874bcb695defcfa68c918e902cfb463d481de5e289c242ae117cbbc3)
+  Score: 17.45 %, Top-1 precision: 13.21 %, Top-3 precision: 20.75 %
+ Dataset "tweets" (8 lines, 117 words, hash a9f3535627edacf86ee788cf684f1be505ed0fd72d213defe35c33ac3f80c735)
+  Score: 22.22 %, Top-1 precision: 17.12 %, Top-3 precision: 27.03 %
 
 
 
