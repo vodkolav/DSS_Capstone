@@ -1,7 +1,5 @@
 # Constructinng the prediction model
 
-load('profane.rda')
-
 tokenize <- function(Lines, n=1)
 {
   Encoding(Lines) <- "latin1"  #remove non-ascii chars 

@@ -5,8 +5,8 @@ load(paste(data.dir,'filesInfo.rData',sep = "/"))
 profane <-paste(data.dir,'profanity_words.txt', sep="/")
 l <- determine_nlines(profane) 
 profane <-char_tolower(get_lines(profane, 1:l))
-save(profane, file = "SlothKey/profane.rda")
-
+save(profane, file = "../SlothKey/profane.rda")
+list.files()
 sample_text <- function(filename ,line_numbers)
 {
   if (is.na(get_lines(filename,1:2)[1])) # check that I can read from file

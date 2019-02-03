@@ -52,7 +52,7 @@ print(paste("ngrams database file: ",dbname))
 list.files()
 source('train.R')
 source('../SlothKey/predict.R')
-
+load('../SlothKey/profane.rda')
 # library(SnowballC)
 # library(stringi)
 # library(hunspell)
@@ -336,7 +336,7 @@ profvis({t <- tokenize(x)})
 lnums <- 347:348
 source("../dsci-benchmark/benchmark.R")
                                                         ##,'blogs' = blogs
-bench <- benchmark(predict.word, sent.list = li+st('tweets' = tweets), ext.output = F)
+profvis({bench <- benchmark(predict.word, sent.list = li+st('tweets' = tweets), ext.output = F)})
 
 ```
 

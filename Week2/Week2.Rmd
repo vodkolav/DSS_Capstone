@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-  knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/DSS_Capstone/Week2/')
+knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/DSS_Capstone/')
 data.dir <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/"
 dbname   <<- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/ngrams"
 library(readtext)
@@ -1245,20 +1245,31 @@ q <- "select  word, freq from gram1  join words on (Id = word1)
 
 gr1 <- sqldf(q, dbname = dbname)
 
-plt1grm <- ggplot(head(gr1,100), aes(x=reorder(word, freq), y=freq)) + 
-        geom_bar(stat="Identity", fill='red') + xlab("") +
+sw <- stopwords("english")
+
+gr1$isStopWord <- gr1$word %in% sw
+                                          #
+plt1grm <- ggplot(head(gr1,300), aes(x=reorder(word, freq), y=freq, fill=isStopWord)) + 
+        geom_bar(stat="Identity") + xlab("") +
         coord_flip() + ylab("Number of Appearances") + ggtitle("most frequent 1grams") 
-ggplotly(plt1grm)
+plt1grm
+htmlwidgets::saveWidget(ggplotly(plt1grm), "plot.html") 
 ```
 
 
 
-SlothKey App first version  
- -first basic version of prediction application
- -tokenize function and profane loading moved to predict.r
- -ngrams database, profanity and predict.r moved to App directory
- -benchmarking gives good results. maybe too good
- -moved quizzes to separate file which is untracked in this repo 
+Stupid backoff formula
+<!-- $$S(w_{i} |w^{i-1}_{i−k+1})=  \begin{cases} -->
+<!--   f(w^{i}_{i−k+1})\over f(w^{i-k}_{i−k+1})  &, \text{if } f(w_{i−k+1}^{i-k}) >0 \\ -->
+<!--   αS(w_{i} |w^{i-k}_{i−k+2}) &, \text{otherwise}. -->
+<!-- \end{cases}$$ -->
+
+
+
+First version of Presentation
+Sloth icon added to app
+
+
 
 
 

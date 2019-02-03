@@ -63,12 +63,14 @@ shinyServer(function(input, output, session) {
       wat <- input$txtType
       if(substr(input$txtType,l,l+1)==" ")
       {
+        tic<<-Sys.time()
         vals$preds <-  predict.word(wat,4)
         #updateRadioButtons(session, inputId = "rbtnPreds", choices = wat)
         updateActionButton(session, inputId = "btnSel1", label = vals$preds[1])
         updateActionButton(session, inputId = "btnSel2", label = vals$preds[2])
         updateActionButton(session, inputId = "btnSel3", label = vals$preds[3])
         updateActionButton(session, inputId = "btnSel4", label = vals$preds[4])
+        print(Sys.time()-tic)
       }
    })      
 })     
