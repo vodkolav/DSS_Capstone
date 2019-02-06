@@ -62,10 +62,10 @@ load('../SlothKey/profane.rda')
 
 ```
 
-Careful!     
-```{r eval=FALSE, include=FALSE}
-if(F){rm(list = ls())}
-```
+<!-- Careful!      -->
+<!-- ```{r eval=FALSE, include=FALSE} -->
+<!-- if(F){rm(list = ls())} -->
+<!-- ``` -->
     
     
     
@@ -167,17 +167,17 @@ buildVocabulary <- function(path, sampSize = 5e4, ngrO = 1, mode = "test" )
 
 ```
 
-TODO: make Id primary key and unique 
+TODO:[X]make Id primary key and unique 
       or
-      make both index words_Id and words_word
+     [V] make both index words_Id and words_word
 
 ```{r}
 result <- buildVocabulary(data.dir, sampSize = 1e2, ngrO = 1, mode = "test")
 ```
 
 
+## Create table of all unique words (vocabulary) and their IDs + table of 1-grams 
 ```{r} 
-#this creates table of all unique words (vocabulary) and their IDs + table of 1-grams 
 
 result <- buildVocabulary(data.dir, sampSize = 1e5, ngrO = 1, mode = "run")
 
@@ -253,7 +253,7 @@ save(results5, file = paste(data.dir, "perf", "5grams.graph.rdata",sep = "/"))
 
 ```
 
-## plot performance metrics
+## Performance metrics graph
 ```{r}
 # results0 <-load(data.dir %/% "perf/1grams.perf.graph.rData")
 # results0 <- results0[[1]]
@@ -300,6 +300,21 @@ writeLines(paste(idxQrs, collapse = ";\n"))
 sqldf(idxQrs, dbname = dbname)
 
 ```
+
+
+##Calculate total words in database and put them in newly created table metadata. 
+used in the terminal case of the algorithm to calculate score of 1grams.
+```{r}
+
+q <- c("CREATE TABLE \"metadata\" (`Name`	Varchar,`Val`	NUMERIC)",
+"insert into metadata  ( Name ,  Val)values (\'total_words\' , (select sum(freq)  from gram1))")
+
+sqldf(q, dbname = dbname)
+
+# To 
+# "select Val as freq from metadata where Name = 'total_words'"
+```
+
 
 #Prediction 
 
