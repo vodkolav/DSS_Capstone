@@ -25,7 +25,7 @@ library(quanteda)
 
 SlothKey is an app that suggests you words as you type so that you can type less and write more!  
 <div class="columns-2">
-  ![](www/SlothKey_Screenshot.png){width=250px}
+  ![](www/SlothKeyLite_Screenshot.png){width=250px}
   <br>
 App usage is really simple and intuitive. Just type your thoughts in the text box and the App will suggest words each time you press space or select a suggestion. Clicking on a suggestion will add it to the end of your text. Convenient!  
 If neither of the suggestions fit you, just continue on typing.

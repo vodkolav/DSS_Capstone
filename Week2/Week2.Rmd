@@ -1278,8 +1278,23 @@ select Val as freq from metadata where Name = 'total_words'
 
 
 
+##Calculate total words in database and put them in newly created table metadata. 
+used in the terminal case of the algorithm to calculate score of 1grams.
+```{r}
 
+dbname <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US/databases previous versions/ngrams (backup 1gr with stopwords)"
 
+a <- sqldf("SELECT name FROM sqlite_master WHERE type=\'table\' AND name=\'metadata\'", dbname = dbname)
+if(nrow(a)==0)
+{
+  q <- c("CREATE TABLE \"metadata\" (`Name`	Varchar,`Val`	NUMERIC)",
+         "insert into metadata  ( Name ,  Val)values (\'total_words\' , (select sum(freq)  from gram1))")
+  sqldf(q, dbname = dbname)
+}
+
+# To 
+# "select Val as freq from metadata where Name = 'total_words'"
+```
 
 
 

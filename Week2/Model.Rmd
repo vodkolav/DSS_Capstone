@@ -303,7 +303,7 @@ sqldf(idxQrs, dbname = dbname)
 
 
 ##Calculate total words in database and put them in newly created table metadata. 
-used in the terminal case of the algorithm to calculate score of 1grams.
+used in the terminal case of the algorithm to calculate score of 1grams. pre-computed for speed.
 ```{r}
 
 q <- c("CREATE TABLE \"metadata\" (`Name`	Varchar,`Val`	NUMERIC)",
