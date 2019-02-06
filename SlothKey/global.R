@@ -22,13 +22,3 @@ print(paste("ngrams database file: ",dbname))
 load('profane.rda')
 source('predict.R')
 
-# Calculate total words in database and put them in newly created table metadata. 
-# Used in the terminal case of the algorithm to calculate score of 1grams. pre-computed for speed.
-# Doing it here to avoid re-uploading 750 Mb of updated databse to shinyapps.
-a <- sqldf("SELECT name FROM sqlite_master WHERE type=\'table\' AND name=\'metadata\'", dbname = dbname)
-if(nrow(a)==0)
-{
-  q <- c("CREATE TABLE \"metadata\" (`Name`	Varchar,`Val`	NUMERIC)",
-         "insert into metadata  ( Name ,  Val)values (\'total_words\' , (select sum(freq)  from gram1))")
-  sqldf(q, dbname = dbname)
-}
