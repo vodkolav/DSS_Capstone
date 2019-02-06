@@ -5,6 +5,7 @@ tokenize <- function(Lines, n=1)
   Encoding(Lines) <- "latin1"  #remove non-ascii chars 
   Lines <- iconv(Lines, "latin1", "ASCII", sub="")
   Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
+  if(Lines =="") {return("")} #sometimes after conversions there might be nothing left from the input 
   Corp  <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
   Corp  <- corpus_reshape(Corp, to = "sentences") # break corpus to single sentences, so that ngrams wont be created on the border of two sentences
   Toks  <- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
@@ -16,7 +17,8 @@ tokenize <- function(Lines, n=1)
 
 constructQuery <- function( search = c('said', 'first', 'quarter' ,'profit'), ngrO = 5, lim = 0)
 {
-  
+  if(ngrO==0){
+    return ("select Val as freq from metadata where Name = \'total_words\'")}
   if(length(search)+1<ngrO) {warning("Warning! length of search can't be lower than ngrO-1 \n")}
   ngrs    <- 1:ngrO
   
@@ -27,22 +29,26 @@ constructQuery <- function( search = c('said', 'first', 'quarter' ,'profit'), ng
   pfrom   <-paste("gram", ngrO, sep = "")
   pjoin   <-paste("join words w", ngrs, " on (w", ngrs, ".id == gram",ngrO,".word", ngrs,")",sep = "",collapse = "\n" )
   #"where"
-  psearch <- paste("\"", search, "\"", sep = "")
-  pwhere  <-paste("w",seq_along(psearch), ".word = ", psearch, sep = "", collapse = " and ")
-  plim    <- if(lim){paste("limit", lim)}else{""} 
+  search <- gsub('\'', '\'\'', search, perl=T) 
+  psearch <- paste("\'", search, "\'", sep = "")
+  pwhere  <- if(length(search)) {paste("where", paste("w",seq_along(psearch), ".word = ", psearch, sep = "", collapse = " and "),"order by freq desc")} else {""}
   
-  q <- paste("select", pselect,"from", pfrom, pjoin, "where", pwhere,"order by freq desc", plim , sep = "\n")
+  plim    <- if(lim){paste("limit", lim)}  else{""} 
+  
+  q <- paste("select", pselect,"from", pfrom, pjoin, pwhere, plim , sep = "\n")
  # TODO: limit n with max freq
   return(q)
 }
 
+#writeLines( constructQuery('i\'d',1))
 #writeLines( constructQuery())
 
 vocabCheck <- function(y)
 {
   #Check input against vocabulary and drop all the words that are not in it.
   #Also, take only 4 last words, since the model is limited to 5-grams.
-  wat <- paste( "\"", y, "\"", sep="", collapse =",")
+  y <- gsub('\'', '\'\'', y, perl=T) 
+  wat <- paste( "\'", y, "\'", sep="", collapse =",")
   ans <- sqldf(paste("select word from words where word in (",wat,")"),dbname = dbname )
   #tryCatch(, error = browser())
   ans <- ans$word
@@ -64,33 +70,30 @@ mostFreqWords <- function(n = 3)
 predict.word <-function(x, n = 3)
 {
   
-  if (stri_length(x)==0){
-    # return n most common words
-    return(mostFreqWords(n))
-    }
-  x<-tokenize(x)[[1]]
+  searchTerm <- if (stri_length(x)!=0){vocabCheck(tokenize(x)[[1]])}else{""}
+
   # x <- gsub('\'', '\'\'', x[[1]], perl=T) 
-  searchTerm <-vocabCheck(x)
-  if (identical(searchTerm,character(0))){
-    return(mostFreqWords(n))}
+  
+  # if (identical(searchTerm,character(0))){
+  #   return(mostFreqWords(n))}
   
   ngrO <- length(searchTerm)+1
   alp <-.4
   SS <- data.table(pred = character(),score = integer(), ngram = numeric())
-  for(i in ngrO:2)
+  for(i in ngrO:1)
   {
+    #lim <- if(nrow(SS)>n){n}else{0}
+    #q <- 
+    #print(q)
     wi <- sqldf(constructQuery(search = searchTerm, i,n),dbname =dbname)
-    if(nrow(wi)<1){
+    #print(system.time())
+    if(nrow(wi)>0){
       #just move on
-    }else{
-      wi_1 <- sqldf(constructQuery(search = searchTerm, i-1,n),dbname =dbname)
+    #}else{
+      wi_1 <- sqldf(constructQuery(search = searchTerm, i-1),dbname =dbname)
       num<- paste("wd",i,sep="")
       S<-data.table(pred = wi[[num]],score =(wi$freq/wi_1$freq)*alp^(ngrO-i), ngram = rep(i,nrow(wi)))
       SS<-rbind(SS,S)
-      if(nrow(SS)>n)
-      {
-        break
-      }
     }
     searchTerm <-searchTerm[-1] #tail(searchTerm,i-1)
   }
@@ -98,21 +101,21 @@ predict.word <-function(x, n = 3)
   #Also, ordered by descending score.
   #SSS <<- sqldf("select pred, max(score)as score, max(ngram) as ngram  from S group by pred order by score desc")
 
-  if(nrow(SS)>0){SS <- SS[order(-score),.(score = max(score)), by=.(pred)]}
+  if(nrow(SS)>0){SS <- SS[order(-score),.(score = max(score)), by=.(pred)]}else{stop("OOpsie. this should not be happening")}
   #SSS <<- S[.(scr),.(scr = max(score)),by=.(pred)]
 
-  sscore <- c(SS$score[-1],0)
+  #sscore <- c(SS$score[-1],0)
   # if(any(!(SS$score >= sscore))) {
   #   stop("Error! SS is not sorted! ")}
 
-  ret <- SS[1:n,pred]
-    if(any(is.na(ret)))
-  {
-      replc<-mostFreqWords(n)
-      ret[is.na(ret)]<-replc[is.na(ret)]
-  }
+  #ret <- SS[1:n,pred]
+  #   if(any(is.na(ret)))
+  # {
+  #     replc<-mostFreqWords(n)
+  #     ret[is.na(ret)]<-replc[is.na(ret)]
+  # }
   
-  return(ret)
+  return(SS[1:n,pred])
   
 }
 

@@ -11,7 +11,6 @@
 initPred <- predict.word('',4)
 # Define UI for application that draws a histogram
 shinyUI(fluidPage(
-  
   navbarPage(
     title = div(img(src="SlothKey-small.png"), "SlothKey",style = "margin:-15px -10px"),
     tabPanel(title = "Home",
@@ -31,7 +30,7 @@ shinyUI(fluidPage(
        ),
     
     # Show a plot of the generated distribution
-    tabPanel(title = "Help")
+    tabPanel(title = "Help",includeHTML("www/help.html"))
   )
 ))
 

@@ -11,7 +11,7 @@ output:
 ```{r setup, include=FALSE}
 #knitr::opts_chunk$set(include = FALSE)
 #knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/DSS_Capstone/')
-
+rm(list = ls())
 library(knitr)
 library(quanteda)
 library(ggplot2)
@@ -25,7 +25,7 @@ library(snow)
 library(sqldf)
 library(plotly)
 library(profvis)
-
+library(stringi)
 #because I always mistype V in View
 vu <- function(x){View(x)} 
 
@@ -312,14 +312,16 @@ x <- "said first quarter profit"
 x <- "Hello, how are you"
 x <- "technical discussions by people that are serious about protecting the"
 x <- "I like how the same people are in almost all of Adam Sandler's" 
+x <- "the social construct is a word "
 pred <- predict.word(x, 50)
 
 "us" %in% pred
 
 vu(pred)
-predict.word("")
-profvis({predict.word(x)})
+predict.word(x)
 system.time(y <- predict.word(x))
+profvis({predict.word(x)})
+
 y
 
 profvis({t <- tokenize(x)})
@@ -330,21 +332,45 @@ profvis({t <- tokenize(x)})
 
 
 ```{r}
-#options(warn=1)
-#test.data.size <-7
-#lnums <- 1:7
-lnums <- 347:348
-source("../dsci-benchmark/benchmark.R")
-                                                        ##,'blogs' = blogs
-profvis({bench <- benchmark(predict.word, sent.list = li+st('tweets' = tweets), ext.output = F)})
-
+#smaller test benchmark
+wut <- get_lines(data.dir %/% 'test' %/% 'wut.txt', 1:3)
+bench <- benchmark(predict.word, sent.list = list('wut' = wut), ext.output = F)
 ```
 
 
+```{r}
+#options(warn=1)
+#test.data.size <-7
+#lnums <- 1:7
+#lnums <- 347:348
+
+#lnums <- 1:700
+source("../dsci-benchmark/benchmark.R")
+                                                        ##
+#profvis({})
+bench <- benchmark(predict.word, sent.list = list('tweets' = tweets,'blogs' = blogs), ext.output = F)
+```
+
+===========================================================================
+
+A realistic result.
+the previous too good result was due to me tokenizing the tweets and blogs test data befor feeding it to the benchmark
+Overall top-3 score:     17.42 %
+Overall top-1 precision: 13.01 %
+Overall top-3 precision: 21.17 %
+Average runtime:         229.02 msec
+Number of predictions:   27423
+Total memory used:       11.05 MB
+
+Dataset details
+ Dataset "blogs" (700 lines, NA words, hash 4cf21f7a2ec15e33ebe1b41f9b39262384fb5cf5cff598fa83831ed2d6ebf7a5)
+  Score: 17.59 %, Top-1 precision: 12.94 %, Top-3 precision: 21.52 %
+ Dataset "tweets" (700 lines, 12328 words, hash d001419f0e0094207624d7c424121e206e41738dd41bdbf06abcaa802a4c2dc6)
+  Score: 17.24 %, Top-1 precision: 13.07 %, Top-3 precision: 20.83 %
+===========================================================================
 
 
-
-Very (maybe too) good result
+Very (maybe too) good result (with code version 7547cb82d)
 Overall top-3 score:     26.78 %
 Overall top-1 precision: 24.22 %
 Overall top-3 precision: 28.99 %

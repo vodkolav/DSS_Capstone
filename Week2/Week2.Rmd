@@ -1266,9 +1266,15 @@ Stupid backoff formula
 
 
 
-First version of Presentation
-Sloth icon added to app
+insert into metadata  
+( Name ,  Val)
+values
+('total_words' , (select sum(freq)  from gram1));
 
+
+
+
+select Val as freq from metadata where Name = 'total_words'
 
 
 
