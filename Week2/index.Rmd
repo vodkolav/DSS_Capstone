@@ -16,7 +16,7 @@ knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/corpus/en_US/')
 # library(readtext)
  library(quanteda)
 # library(SnowballC)
-# library(ggplot2)
+ library(ggplot2)
  library(LaF)
  library(plyr)
  library(dplyr)
@@ -25,7 +25,7 @@ knitr::opts_knit$set(root.dir = '~/Studies/Coursera/10-Capstone/corpus/en_US/')
  library(data.table)
 # library(stringi)
 # library(hunspell)
-# library(gridExtra)
+ library(gridExtra)
 # library(viridis)
  library(RColorBrewer)
 ```
@@ -49,7 +49,7 @@ wc <- function(path)
     return(data.frame('file' = wsplit[5], 'size,MiB' = size, 'lines'=wnum[1], 'words'=wnum[2], 'chars'=wnum[3], stringsAsFactors = F))
 }
 
-files = list.files(".",pattern = "en*", full.names = F)
+files = list.files(".",pattern = "^en*", full.names = F)
 
 files = lapply(files, FUN = wc)# determine_nlines)
 
@@ -83,16 +83,16 @@ So in this step I:
 -Convert everything to lower case and remove foreign languages (non-ASCII) characters  
 -Create corpus object  
  
-```{r Corpus, comment=NA, cache=T }
+```{r Corpus, comment=NA}
 currentFile = 'en_US.blogs.txt'
-if (is.na(get_lines(currentFile,1:2)[1])) # check that I can read from file
+if (is.na(get_lines(currentFile,1:2)[1])){stop("cant read from file. probably path is wrong")}# check that I can read from file
 set.seed(42)
 Lines <- sample_lines(currentFile, 1e4, files[currentFile,]$lines) #sample some lines from a file
 Encoding(Lines) <- "latin1"  #remove non-ascii chars 
 Lines <- iconv(Lines, "latin1", "ASCII", sub="")
 Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
 Corp <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
-paste(head(texts(Corp)))
+writeLines(head(texts(Corp)))
 ```
 
 ##Tokenization
