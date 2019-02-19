@@ -10,7 +10,7 @@ output:
 
 ```{r eval=FALSE, include=FALSE}
 #creates help file for the app from this rmd. Run it manually.
-rmarkdown::render('SlideDeck.Rmd', output_file = 'www/help.html',output_format = "html_document", output_options = " smaller: no")
+rmarkdown::render('index.Rmd', output_file = 'www/help.html',output_format = "html_document", output_options = " smaller: no")
 ```
 
 
@@ -27,6 +27,7 @@ SlothKey is an app that suggests you words as you type so that you can type less
 <div class="columns-2">
   ![](www/SlothKeyLite_Screenshot.png){width=250px}
   <br>
+  <br>
 App usage is really simple and intuitive. Just type your thoughts in the text box and the App will suggest words each time you press space or select a suggestion. Clicking on a suggestion will add it to the end of your text. Convenient!  
 If neither of the suggestions fit you, just continue on typing.
 </div>
@@ -38,7 +39,7 @@ Well, no. The whole app relies on a lot of training data and 2 simple ideas: n-g
 
 ##N-grams
 
-```{r include=FALSE}
+```{r brown_fox, include=FALSE}
 fox <- "brown fox jumped over another brown fox"
 ngrams <- 2
 ```
@@ -47,7 +48,7 @@ ngrams <- 2
 N-grams are combinations of n words taken from a text.
 So if a text was "`r fox`"  then `r ngrams`grams for it would be:  
 
-```{r brown_fox, echo=FALSE, comment=NA}
+```{r ngrams, echo=FALSE, comment=NA}
 foxtok = tokens(fox,ngrams = ngrams, remove_number =T)
 myfun <- function(x) {paste("\n", strrep(" ",cumsum(nchar(x)+1)))}
 lal <- sapply(strsplit(fox," "),myfun)
@@ -59,7 +60,7 @@ When this approach is applied to a vast corpus of text, you get a large database
 Now then, to predict the next word a user will type, you take n last words he already typed and look for n+1 gram that begins with these words. The last word of the found ngram is your prediction.
 
 But this raises several questions:  
-  - What if a user types a phrase so rare it does not exist in our model?  
+  - What if a user types a phrase so rare it does not exist in our database?  
   - If several predictions were found, how do you determine the best one to suggest?  
 </div>  
 
@@ -75,17 +76,39 @@ $$S(\text{tips }|\text{ here are a few})= \begin{cases}
 Where $S$ is a score of a suggestion, $f$ is frequency of an ngram and $α$ is backoff factor that equalizes the scores between different ngram orders.  
 The first case of formula calculates scores of the found ngrams which allows to select single best suggestion for the input.
 
-##
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<br>
-<center>
 
-<!-- ![your image caption](image.png) -->
+## Performance
+The following report sums up the main performance characteristics of the model. 
+While 13% precision seems low, it's perceived accuracy is close to other similar solutions present on the market.
+Such precision is actually quite close to the upper bound of what is possible with a backoff model.  
+
+```{r load, include=FALSE}
+data.dir <- "/home/michael/Studies/Coursera/10-Capstone/corpus/en_US"
+`%/%` = function(e1,e2) return(paste(e1,e2, sep = "/"))
+library(LaF)
+library(sqldf)
+source("../dsci-benchmark/benchmark.R")
+load('profane.rda')
+# db which has:1 to 5 grams, stopwords remain , freq=1 filtered out, indices created, 746 MB
+dbname <- "." %/% "ngrams"
+source('predict.R')
+```
+
+
+```{r Performance, echo=FALSE, cache=T, comment=NA}
+load('../Week2/benchmark.rds')
+cat(bench[1:3])
+```
+
+A 100 millisecond delay per suggestion is barely acceptable in terms of user experience. (Hence, the name (⊙ω⊙) )
+It may be further improved, but this is out of the scope for current work.
+
+
+<br>
+<br>
+<br>
+
+<center>
 ###Questions?
 </center>
 

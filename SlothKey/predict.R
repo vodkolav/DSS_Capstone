@@ -5,11 +5,13 @@ tokenize <- function(Lines, n=1)
   Encoding(Lines) <- "latin1"  #remove non-ascii chars 
   Lines <- iconv(Lines, "latin1", "ASCII", sub="")
   Lines <- gsub('_+', ' ', Lines, perl=T) #replace all underscores (including multiple _____) with whitespace
-  if(Lines =="") {return("")} #sometimes after conversions there might be nothing left from the input 
-  Corp  <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
-  Corp  <- corpus_reshape(Corp, to = "sentences") # break corpus to single sentences, so that ngrams wont be created on the border of two sentences
+  Corp <- ""
+  if(all(Lines != c(" ",""))) { #sometimes after conversions there might be nothing left from the input 
+    Corp  <- corpus(char_tolower(Lines)) # everything to lowerCase and create corpus
+    Corp  <- corpus_reshape(Corp, to = "sentences") # break corpus to single sentences, so that ngrams wont be created on the border of two sentences
+  }
   Toks  <- tokens(Corp, what = "word", remove_numbers = T, remove_punct = T, remove_symbols = T,
-                  remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T)
+                  remove_separators = T, remove_twitter = T, remove_hyphens = T, remove_url = T) 
   rm(Lines,Corp)              #stopwords("english"),
   Toks <- tokens_remove(Toks, c( profane, "rt")) # also remove ReTweet tag
   if(n>1){return(tokens_ngrams(Toks, n))}else{return(Toks)}

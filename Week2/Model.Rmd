@@ -335,7 +335,7 @@ pred <- predict.word(x, 50)
 vu(pred)
 predict.word(x)
 system.time(y <- predict.word(x))
-profvis({predict.word(x)})
+profvis({predict.word(x)}, interval = 0.005)
 
 y
 
@@ -348,8 +348,10 @@ profvis({t <- tokenize(x)})
 
 ```{r}
 #smaller test benchmark
+source("../dsci-benchmark/benchmark.R")
 wut <- get_lines(data.dir %/% 'test' %/% 'wut.txt', 1:3)
 bench <- benchmark(predict.word, sent.list = list('wut' = wut), ext.output = F)
+cat(bench)
 ```
 
 
@@ -364,6 +366,8 @@ source("../dsci-benchmark/benchmark.R")
                                                         ##
 #profvis({})
 bench <- benchmark(predict.word, sent.list = list('tweets' = tweets,'blogs' = blogs), ext.output = F)
+save(bench, file = 'benchmark.rds')
+cat(bench)
 ```
 
 ===========================================================================

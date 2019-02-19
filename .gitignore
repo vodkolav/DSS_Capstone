@@ -8,6 +8,7 @@
 **.Rprof
 **.rds
 **ngrams
+**ngrams-journal
 **profiling
 Week2/mydb
 Week2/Quiz.Rmd
