@@ -182,7 +182,7 @@ So I see that the coverage graph grows very fast. About 20% most frequent tokens
 N-grams are a sequences of n words taken from a text and incorporated as a single token.  
 So if a text was "The quick brown fox jumps over  another quick brown fox" then 3-grams for it would be:
 
-```{r brown_fox, echo=FALSE}
+```{r brown_fox, echo=FALSE, comment=NA}
 fox = "The quick brown fox jumps over another quick brown fox"
 foxtok = tokens(fox,ngrams = 3, remove_number =T)
 myfun <- function(x) {paste("\n", strrep(" ",cumsum(nchar(x)+1)))}
@@ -236,17 +236,17 @@ save(Dfm1gr,Dfm2gr,Dfm3gr,files,tfm, file = "123grams.rData")
 
 ## Questions to consider
 Here are some preprocessing steps which could further improve the model, but I decided to skip them because they will require a lot of time to develop.  
--Do a segmentation of twitter hashtags into separate words (like #hashtag -> hash tag) .
--Substitute or remove tokens which start with a number (like "10,000th -> th" )
--Maybe better not to remove stopwords since they are an essential part of speech and wothout them the sentences will be syntactically incorrect. 
+- Perform segmentation of twitter hashtags into separate words (like #hashtag -> hash tag).  
+- Substitute or remove tokens which start with a number (like "100th" -> "hundredth")  
+- Maybe better not to remove stopwords since they are an essential part of speech and without them the sentences will be syntactically incorrect.  
 
 ## Next steps
 
 So judging from this overview, a straightforward solution to the project's goal seems simple:  
--Pre-calculate a frequencies database for all 1,2,3,4, maybe 5-grams.  
--For every new word in a sequence that a user types, find in the database all n-grams that begin similarly  
--Calculate a degree of fit for every found n-gram according to some formula  
--Select n-gram with best fit.  
+- Pre-calculate a frequencies database for all 1,2,3,4, maybe 5-grams.  
+- For every new word in a sequence that a user types, find in the database all n-grams that begin similarly  
+- Calculate a degree of fit for every found n-gram according to some formula  
+- Select n-gram with best fit.  
 
 ## Implementation
 

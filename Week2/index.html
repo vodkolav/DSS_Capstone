@@ -312,14 +312,14 @@ coverage</code></pre>
 <h2>N-grams</h2>
 <p>N-grams are a sequences of n words taken from a text and incorporated as a single token.<br />
 So if a text was “The quick brown fox jumps over another quick brown fox” then 3-grams for it would be:</p>
-<pre><code>## The_quick_brown
-##      quick_brown_fox
-##            brown_fox_jumps
-##                  fox_jumps_over
-##                      jumps_over_another
-##                            over_another_quick
-##                                 another_quick_brown
-##                                         quick_brown_fox</code></pre>
+<pre><code>The_quick_brown
+     quick_brown_fox
+           brown_fox_jumps
+                 fox_jumps_over
+                     jumps_over_another
+                           over_another_quick
+                                another_quick_brown
+                                        quick_brown_fox</code></pre>
 <p>The next step is to create Document-feature matrix (DFM) out of these 3-grams. So for example in the case of 3-grams each token represents 3 consecutive words. So all the tokens in our example will have 1 appearance except for “quick_brown_fox”, which will have 2.</p>
 <p>I will create 1, 2 and 3-grams for the document to get the general picture of the data. 1-gram is just dfm of single words which I’ve already created earlier.</p>
 <pre class="r"><code>bigrams &lt;- tokens_ngrams(Toks, 2)
@@ -352,15 +352,17 @@ grid.arrange(plt1grm, plt2grm, plt3grm, ncol=3)</code></pre>
 <div id="questions-to-consider" class="section level2">
 <h2>Questions to consider</h2>
 <p>Here are some preprocessing steps which could further improve the model, but I decided to skip them because they will require a lot of time to develop.<br />
--Do a segmentation of twitter hashtags into separate words (like #hashtag -&gt; hash tag) . -Substitute or remove tokens which start with a number (like “10,000th -&gt; th” ) -Maybe better not to remove stopwords since they are an essential part of speech and wothout them the sentences will be syntactically incorrect.</p>
+- Do a segmentation of twitter hashtags into separate words (like #hashtag -&gt; hash tag).<br />
+- Substitute or remove tokens which start with a number (like “10,000th” -&gt; “th”)<br />
+- Maybe better not to remove stopwords since they are an essential part of speech and without them the sentences will be syntactically incorrect.</p>
 </div>
 <div id="next-steps" class="section level2">
 <h2>Next steps</h2>
 <p>So judging from this overview, a straightforward solution to the project’s goal seems simple:<br />
--Pre-calculate a frequencies database for all 1,2,3,4, maybe 5-grams.<br />
--For every new word in a sequence that a user types, find in the database all n-grams that begin similarly<br />
--Calculate a degree of fit for every found n-gram according to some formula<br />
--Select n-gram with best fit.</p>
+- Pre-calculate a frequencies database for all 1,2,3,4, maybe 5-grams.<br />
+- For every new word in a sequence that a user types, find in the database all n-grams that begin similarly<br />
+- Calculate a degree of fit for every found n-gram according to some formula<br />
+- Select n-gram with best fit.</p>
 </div>
 <div id="implementation" class="section level2">
 <h2>Implementation</h2>

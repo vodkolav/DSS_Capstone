@@ -22,7 +22,8 @@
       // Slide settings
       settings: {
                 title: 'SlothKey',
-                        useBuilds: true,
+                        subtitle: 'Type! less…',
+                useBuilds: true,
         usePrettify: true,
         enableSlideAreas: true,
         enableTouch: true,
@@ -155,22 +156,22 @@ SlothKey is an app that suggests you words as you type so that you can type less
 
 </article></slide><slide class=""><hgroup><h2>Performance</h2></hgroup><article  id="performance" class="smaller ">
 
-<p>The following report sums up the main performance characteristics of the model. The 13% precision seems low, but actually is quite close to the upper bound of what is possible with a backoff model.<br/>It performs reasonably well with common phrases.</p>
+<p>The following report sums up the main performance characteristics of the model. While 13% precision seems low, it&#39;s perceived accuracy is close to other similar solutions present on the market. Such precision is actually quite close to the upper bound of what is possible with a backoff model.</p>
 
 <pre >Overall top-3 score:     17.54 %
 Overall top-1 precision: 13.10 %
 Overall top-3 precision: 21.30 %
-Average runtime:         119.22 msec
+Average runtime:         114.39 msec
 Number of predictions:   29096
-Total memory used:       1.34 MB
-
+Total memory used:       1.99 MB
+ 
 Dataset details
- Dataset &quot;blogs&quot; (599 lines, 14587 words, hash 5c3fe67d1857e2d)
+  Dataset &quot;blogs&quot; (599 lines, 14587 words, hash 5c3fe67d1857e2d)
   Score: 17.71 %, Top-1 precision: 13.03 %, Top-3 precision: 21.66 %
- Dataset &quot;tweets&quot; (793 lines, 14071 words, hash 5debebc89c18e70)
+  Dataset &quot;tweets&quot; (793 lines, 14071 words, hash 5debebc89c18e70)
   Score: 17.37 %, Top-1 precision: 13.17 %, Top-3 precision: 20.94 %</pre>
 
-<p>A 100 millisecond delay per suggestion is barely acceptable in terms of user experience. Hence, the name (⊙ω⊙)<br/>It may be further improved, but this is out of the scope for current work.</p>
+<p>A 100 millisecond delay per suggestion is barely acceptable in terms of user experience. (Hence, the name (⊙ω⊙) ) It may be further improved, but this is out of the scope for current work.</p>
 
 <p><br> <br> <br></p>
 
