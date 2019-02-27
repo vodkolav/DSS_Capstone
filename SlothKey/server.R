@@ -12,7 +12,7 @@ shinyServer(function(input, output, session) {
   vals <- reactiveValues(
     
     text = "your text",
-    preds = predict.word("",1)
+    preds = predict.word("",4)
   )
   
   
@@ -33,7 +33,28 @@ shinyServer(function(input, output, session) {
     #input$txtType <- renderText(watt)
   })
 
+  observeEvent(input$btnSel2, {
+    preds <- vals$preds[2]
+    watt <- paste(input$txtType,preds," ", sep = '')
+    updateTextAreaInput(session, inputId = "txtType", value = watt)
+    #input$txtType <- renderText(watt)
+    session$sendCustomMessage("refocus",list(NULL))
+  })
+  observeEvent(input$btnSel3, {
+    preds <- vals$preds[3]
+    watt <- paste(input$txtType,preds," ", sep = '')
+    updateTextAreaInput(session, inputId = "txtType", value = watt)
+    #input$txtType <- renderText(watt)
+    session$sendCustomMessage("refocus",list(NULL))
+  })
 
+  observeEvent(input$btnSel4, {
+    preds <- vals$preds[4]
+    watt <- paste(input$txtType,preds," ", sep = '')
+    updateTextAreaInput(session, inputId = "txtType", value = watt)
+    session$sendCustomMessage("refocus",list(NULL))
+    #input$txtType <- renderText(watt)
+  })
   
   
   
