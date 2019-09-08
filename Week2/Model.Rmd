@@ -276,7 +276,7 @@ g1 <- ggplot(data = )
 ## deflating database
 removing all records where freq = 1 and decreasing database's file size on disk
 ```{r}
-ptables <- paste("gram", 2:5, sep = "") # 1 grams with freq = 1 will not be removed
+ptables <- paste("gram", 2:5, sep = "") # 2:5 means that 1 grams with freq = 1 will not be removed
 deleteQrs <- paste("delete from", ptables, "where freq = 1")
 
 sqldf(deleteQrs, dbname = dbname)

@@ -15,11 +15,12 @@ shinyUI(fluidPage(
     title = div(img(src="SlothKey-small.png"), "SlothKey",style = "margin:-15px -10px"),
     tabPanel(title = "Home",
        mainPanel(
-        textAreaInput("txtType", "Type your thoughts here and the Sloth will suggest words each time you press space", "", width = "100%", height = "400px"),
+        p("Type your thoughts here and the Sloth will suggest words each time you press space"),
         actionButton("btnSel1", initPred[1]),
         actionButton("btnSel2", initPred[2]),
         actionButton("btnSel3", initPred[3]),
         actionButton("btnSel4", initPred[4]),
+        textAreaInput("txtType", "", "", width = "100%", height = "400px"),
         tags$script('Shiny.addCustomMessageHandler("refocus",
                      function(NULL) 
                      {
